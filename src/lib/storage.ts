@@ -1,9 +1,9 @@
 "use client";
 
-import type { XtreamCredentials } from "./xtream";
+import type { XtreamCredentials, LiveStreamFormat } from "./xtream";
 
 /**
- * Browser-only storage for credentials & favorites.
+ * Browser-only storage for credentials, favorites & settings.
  *
  * IMPORTANT: Credentials live in `localStorage` on THIS device only.
  * They are never sent to our own server (only to the IPTV host through
@@ -14,6 +14,19 @@ const CREDS_KEY = "iptv:creds";
 const FAV_LIVE_KEY = "iptv:fav:live";
 const FAV_VOD_KEY = "iptv:fav:vod";
 const FAV_SERIES_KEY = "iptv:fav:series";
+const SETTINGS_KEY = "iptv:settings";
+
+export interface IptvSettings {
+  /** Live stream container format. Some providers don't serve .m3u8. */
+  liveFormat: LiveStreamFormat;
+  /** Show "Now playing" EPG overlay on live cards (extra API call per row). */
+  showEpgOnCards: boolean;
+}
+
+const DEFAULT_SETTINGS: IptvSettings = {
+  liveFormat: "m3u8",
+  showEpgOnCards: true,
+};
 
 export function loadCreds(): XtreamCredentials | null {
   if (typeof window === "undefined") return null;
@@ -36,6 +49,23 @@ export function saveCreds(creds: XtreamCredentials) {
 export function clearCreds() {
   if (typeof window === "undefined") return;
   localStorage.removeItem(CREDS_KEY);
+}
+
+export function loadSettings(): IptvSettings {
+  if (typeof window === "undefined") return DEFAULT_SETTINGS;
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    if (!raw) return DEFAULT_SETTINGS;
+    const parsed = JSON.parse(raw);
+    return { ...DEFAULT_SETTINGS, ...parsed };
+  } catch {
+    return DEFAULT_SETTINGS;
+  }
+}
+
+export function saveSettings(s: IptvSettings) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
 }
 
 function loadSet(key: string): Set<string> {

@@ -6,7 +6,10 @@ A self-hosted Xtream Codes IPTV web client. Bring your own credentials — they 
 
 - A Next.js 16 + TypeScript web app you deploy **for yourself** (e.g. on Vercel)
 - A login screen where you enter your **own** Xtream Codes `host / username / password`
-- A grid-based player for Live TV, Movies (VOD), and Series, with categories, search, and favorites
+- A **Home tab** with horizontal scroller rows: Favorites, Trending (top-rated movies), Recently Added Movies, Popular Live, Music, Recently Added Series, plus quick-link cards to each section
+- A grid-based browser for Live TV, Movies (VOD), and Series, with categories, search, and favorites
+- **EPG (program guide)** modal on every live channel — shows now/next programs with LIVE indicator
+- **Settings dialog** with live stream format toggle (`.m3u8` HLS vs `.ts` MPEG-TS fallback) and EPG overlay toggle
 - Powered by `hls.js` for live `.m3u8` streams and native `<video>` for VOD `.mp4` files
 
 ## What this is NOT
@@ -22,6 +25,7 @@ A self-hosted Xtream Codes IPTV web client. Bring your own credentials — they 
 |---|---|
 | Browser `localStorage` | Your `host / username / password` (so you don't have to re-login every visit) |
 | Browser `localStorage` | Favorite channel/movie/series IDs |
+| Browser `localStorage` | Settings (live stream format, EPG overlay toggle) |
 | Server (`/api/xtream`) | **Nothing.** The proxy is stateless and cache-free (`Cache-Control: no-store`). |
 | Logs | No credentials are ever logged. |
 

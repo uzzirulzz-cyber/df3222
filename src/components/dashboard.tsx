@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -14,14 +14,25 @@ import {
   LogOut,
   Star,
   Server,
-  RefreshCw,
   Heart,
+  Home as HomeIcon,
+  Settings2,
+  Calendar,
 } from "lucide-react";
-import type { XtreamCredentials, Category, LiveStream, VodStream, SeriesItem } from "@/lib/xtream";
+import type {
+  XtreamCredentials,
+  Category,
+  LiveStream,
+  VodStream,
+  SeriesItem,
+} from "@/lib/xtream";
 import { Xtream } from "@/lib/xtream";
-import { favorites } from "@/lib/storage";
+import { favorites, loadSettings, saveSettings, type IptvSettings } from "@/lib/storage";
 import { VideoPlayer } from "./video-player";
 import { SeriesDetail } from "./series-detail";
+import { SettingsDialog } from "./settings-dialog";
+import { EpgModal } from "./epg-modal";
+import { HomeTab } from "./home-tab";
 
 interface DashboardProps {
   creds: XtreamCredentials;
@@ -29,14 +40,14 @@ interface DashboardProps {
   onLogout: () => void;
 }
 
-type ContentType = "live" | "vod" | "series";
+type ContentType = "home" | "live" | "vod" | "series";
 type PlayingItem =
   | { kind: "live"; streamId: number; title: string; icon?: string }
   | { kind: "vod"; streamId: number; title: string; container: string; icon?: string }
   | null;
 
 export function Dashboard({ creds, serverName, onLogout }: DashboardProps) {
-  const [tab, setTab] = useState<ContentType>("live");
+  const [tab, setTab] = useState<ContentType>("home");
 
   // Live state
   const [liveCategories, setLiveCategories] = useState<Category[]>([]);
@@ -60,7 +71,12 @@ export function Dashboard({ creds, serverName, onLogout }: DashboardProps) {
   const [showFavsOnly, setShowFavsOnly] = useState(false);
   const [playing, setPlaying] = useState<PlayingItem>(null);
   const [selectedSeries, setSelectedSeries] = useState<SeriesItem | null>(null);
+  const [epgStream, setEpgStream] = useState<LiveStream | null>(null);
   const [favTick, setFavTick] = useState(0); // bump to re-render after fav toggle
+
+  // Settings
+  const [settings, setSettings] = useState<IptvSettings>(() => loadSettings());
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   // Initial load: live categories + streams
   useEffect(() => {
@@ -80,9 +96,11 @@ export function Dashboard({ creds, serverName, onLogout }: DashboardProps) {
     };
   }, [creds]);
 
-  // VOD load (lazy)
+  // VOD load — eager when on Home, lazy otherwise
   useEffect(() => {
-    if (tab !== "vod" || vodCategories.length > 0) return;
+    if (vodCategories.length > 0) return;
+    // Load on Home or VOD tab
+    if (tab !== "home" && tab !== "vod") return;
     let cancelled = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setVodLoading(true);
@@ -99,9 +117,10 @@ export function Dashboard({ creds, serverName, onLogout }: DashboardProps) {
     };
   }, [tab, creds, vodCategories.length]);
 
-  // Series load (lazy)
+  // Series load — eager when on Home, lazy otherwise
   useEffect(() => {
-    if (tab !== "series" || seriesCategories.length > 0) return;
+    if (seriesCategories.length > 0) return;
+    if (tab !== "home" && tab !== "series") return;
     let cancelled = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setSeriesLoading(true);
@@ -118,8 +137,9 @@ export function Dashboard({ creds, serverName, onLogout }: DashboardProps) {
     };
   }, [tab, creds, seriesCategories.length]);
 
-  // Reset filters when switching tabs
+  // Reset filters when switching tabs (not on Home)
   useEffect(() => {
+    if (tab === "home") return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setSearch("");
     setShowFavsOnly(false);
@@ -187,6 +207,28 @@ export function Dashboard({ creds, serverName, onLogout }: DashboardProps) {
     setFavTick((t) => t + 1);
   };
 
+  const handleSaveSettings = (s: IptvSettings) => {
+    setSettings(s);
+    saveSettings(s);
+  };
+
+  // Common handlers for playing from Home or grid
+  const playLive = (s: LiveStream) =>
+    setPlaying({
+      kind: "live",
+      streamId: s.stream_id,
+      title: s.name,
+      icon: s.stream_icon,
+    });
+  const playVod = (s: VodStream) =>
+    setPlaying({
+      kind: "vod",
+      streamId: s.stream_id,
+      title: s.name,
+      container: s.container_extension,
+      icon: s.stream_icon,
+    });
+
   return (
     <div className="min-h-screen bg-zinc-950 text-white flex flex-col">
       {/* Top bar */}
@@ -199,8 +241,19 @@ export function Dashboard({ creds, serverName, onLogout }: DashboardProps) {
             <h1 className="text-sm font-semibold truncate">Personal IPTV</h1>
             <p className="text-xs text-zinc-500 flex items-center gap-1 truncate">
               <Server className="w-3 h-3" /> {serverName}
+              <span className="mx-1.5 text-zinc-700">·</span>
+              <span className="uppercase">{settings.liveFormat}</span>
             </p>
           </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setSettingsOpen(true)}
+            className="text-zinc-400 hover:text-white hover:bg-zinc-800"
+            aria-label="Settings"
+          >
+            <Settings2 className="w-4 h-4" />
+          </Button>
           <Button
             variant="ghost"
             size="sm"
@@ -216,6 +269,12 @@ export function Dashboard({ creds, serverName, onLogout }: DashboardProps) {
         <Tabs value={tab} onValueChange={(v) => setTab(v as ContentType)} className="flex-1 flex flex-col">
           <div className="border-b border-zinc-800 bg-zinc-950">
             <TabsList className="bg-transparent h-auto p-0 rounded-none">
+              <TabsTrigger
+                value="home"
+                className="data-[state=active]:bg-zinc-900 data-[state=active]:text-white text-zinc-400 rounded-none border-b-2 border-transparent data-[state=active]:border-rose-500 px-4 py-3"
+              >
+                <HomeIcon className="w-4 h-4 mr-2" /> Home
+              </TabsTrigger>
               <TabsTrigger
                 value="live"
                 className="data-[state=active]:bg-zinc-900 data-[state=active]:text-white text-zinc-400 rounded-none border-b-2 border-transparent data-[state=active]:border-rose-500 px-4 py-3"
@@ -237,95 +296,118 @@ export function Dashboard({ creds, serverName, onLogout }: DashboardProps) {
             </TabsList>
           </div>
 
-          {/* Search + favorites toggle */}
-          <div className="flex items-center gap-2 px-4 py-3 border-b border-zinc-800 bg-zinc-950">
-            <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
-              <Input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search…"
-                className="pl-9 bg-zinc-900 border-zinc-800 text-white placeholder-zinc-500"
-              />
+          {/* Search + favorites toggle (hidden on Home) */}
+          {tab !== "home" && (
+            <div className="flex items-center gap-2 px-4 py-3 border-b border-zinc-800 bg-zinc-950">
+              <div className="relative flex-1 max-w-md">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                <Input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search…"
+                  className="pl-9 bg-zinc-900 border-zinc-800 text-white placeholder-zinc-500"
+                />
+              </div>
+              <Button
+                variant={showFavsOnly ? "default" : "outline"}
+                size="sm"
+                onClick={() => setShowFavsOnly((v) => !v)}
+                className={
+                  showFavsOnly
+                    ? "bg-rose-500 hover:bg-rose-600 text-white border-rose-500"
+                    : "bg-zinc-900 border-zinc-800 text-zinc-300 hover:text-white"
+                }
+              >
+                <Heart className={`w-4 h-4 mr-1 ${showFavsOnly ? "fill-current" : ""}`} />
+                Favorites
+              </Button>
             </div>
-            <Button
-              variant={showFavsOnly ? "default" : "outline"}
-              size="sm"
-              onClick={() => setShowFavsOnly((v) => !v)}
-              className={
-                showFavsOnly
-                  ? "bg-rose-500 hover:bg-rose-600 text-white border-rose-500"
-                  : "bg-zinc-900 border-zinc-800 text-zinc-300 hover:text-white"
-              }
-            >
-              <Heart className={`w-4 h-4 mr-1 ${showFavsOnly ? "fill-current" : ""}`} />
-              Favorites
-            </Button>
-          </div>
+          )}
 
           <div className="flex-1 flex min-h-0">
-            {/* Sidebar: categories */}
-            <aside className="hidden md:block w-60 flex-shrink-0 border-r border-zinc-800 bg-zinc-950">
-              <ScrollArea className="h-[calc(100vh-10rem)]">
-                <div className="p-2">
-                  <p className="px-2 py-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">
-                    Categories
-                  </p>
-                  {tab === "live" && (
-                    <CategoryList
-                      categories={liveCategories}
-                      active={activeLiveCat}
-                      onSelect={setActiveLiveCat}
-                      loading={liveLoading}
-                    />
-                  )}
-                  {tab === "vod" && (
-                    <CategoryList
-                      categories={vodCategories}
-                      active={activeVodCat}
-                      onSelect={setActiveVodCat}
-                      loading={vodLoading}
-                    />
-                  )}
-                  {tab === "series" && (
-                    <CategoryList
-                      categories={seriesCategories}
-                      active={activeSeriesCat}
-                      onSelect={setActiveSeriesCat}
-                      loading={seriesLoading}
-                    />
-                  )}
-                </div>
-              </ScrollArea>
-            </aside>
+            {/* Sidebar: categories (hidden on Home) */}
+            {tab !== "home" && (
+              <aside className="hidden md:block w-60 flex-shrink-0 border-r border-zinc-800 bg-zinc-950">
+                <ScrollArea className="h-[calc(100vh-10rem)]">
+                  <div className="p-2">
+                    <p className="px-2 py-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                      Categories
+                    </p>
+                    {tab === "live" && (
+                      <CategoryList
+                        categories={liveCategories}
+                        active={activeLiveCat}
+                        onSelect={setActiveLiveCat}
+                        loading={liveLoading}
+                      />
+                    )}
+                    {tab === "vod" && (
+                      <CategoryList
+                        categories={vodCategories}
+                        active={activeVodCat}
+                        onSelect={setActiveVodCat}
+                        loading={vodLoading}
+                      />
+                    )}
+                    {tab === "series" && (
+                      <CategoryList
+                        categories={seriesCategories}
+                        active={activeSeriesCat}
+                        onSelect={setActiveSeriesCat}
+                        loading={seriesLoading}
+                      />
+                    )}
+                  </div>
+                </ScrollArea>
+              </aside>
+            )}
 
-            {/* Mobile category dropdown */}
-            <div className="md:hidden border-b border-zinc-800 bg-zinc-950 px-4 py-2">
-              {tab === "live" && (
-                <MobileCategorySelect
-                  categories={liveCategories}
-                  active={activeLiveCat}
-                  onSelect={setActiveLiveCat}
-                />
-              )}
-              {tab === "vod" && (
-                <MobileCategorySelect
-                  categories={vodCategories}
-                  active={activeVodCat}
-                  onSelect={setActiveVodCat}
-                />
-              )}
-              {tab === "series" && (
-                <MobileCategorySelect
-                  categories={seriesCategories}
-                  active={activeSeriesCat}
-                  onSelect={setActiveSeriesCat}
-                />
-              )}
-            </div>
+            {/* Mobile category dropdown (hidden on Home) */}
+            {tab !== "home" && (
+              <div className="md:hidden border-b border-zinc-800 bg-zinc-950 px-4 py-2 w-full">
+                {tab === "live" && (
+                  <MobileCategorySelect
+                    categories={liveCategories}
+                    active={activeLiveCat}
+                    onSelect={setActiveLiveCat}
+                  />
+                )}
+                {tab === "vod" && (
+                  <MobileCategorySelect
+                    categories={vodCategories}
+                    active={activeVodCat}
+                    onSelect={setActiveVodCat}
+                  />
+                )}
+                {tab === "series" && (
+                  <MobileCategorySelect
+                    categories={seriesCategories}
+                    active={activeSeriesCat}
+                    onSelect={setActiveSeriesCat}
+                  />
+                )}
+              </div>
+            )}
 
-            {/* Content grid */}
+            {/* Content area */}
             <div className="flex-1 min-w-0 overflow-y-auto">
+              <TabsContent value="home" className="m-0 p-4">
+                <HomeTab
+                  creds={creds}
+                  liveStreams={liveStreams}
+                  vodStreams={vodStreams}
+                  seriesItems={seriesItems}
+                  liveCategories={liveCategories}
+                  vodCategories={vodCategories}
+                  seriesCategories={seriesCategories}
+                  favTick={favTick}
+                  onPlayLive={playLive}
+                  onPlayVod={playVod}
+                  onOpenSeries={(s) => setSelectedSeries(s)}
+                  onGoToTab={(t) => setTab(t)}
+                />
+              </TabsContent>
+
               <TabsContent value="live" className="m-0 p-4">
                 {liveLoading ? (
                   <GridSkeleton />
@@ -337,14 +419,8 @@ export function Dashboard({ creds, serverName, onLogout }: DashboardProps) {
                       <LiveCard
                         key={s.stream_id}
                         stream={s}
-                        onPlay={() =>
-                          setPlaying({
-                            kind: "live",
-                            streamId: s.stream_id,
-                            title: s.name,
-                            icon: s.stream_icon,
-                          })
-                        }
+                        onPlay={() => playLive(s)}
+                        onShowEpg={() => setEpgStream(s)}
                         isFav={favorites.live.has(String(s.stream_id))}
                         onToggleFav={() => toggleFavLive(s.stream_id)}
                       />
@@ -364,15 +440,7 @@ export function Dashboard({ creds, serverName, onLogout }: DashboardProps) {
                       <VodCard
                         key={s.stream_id}
                         stream={s}
-                        onPlay={() =>
-                          setPlaying({
-                            kind: "vod",
-                            streamId: s.stream_id,
-                            title: s.name,
-                            container: s.container_extension,
-                            icon: s.stream_icon,
-                          })
-                        }
+                        onPlay={() => playVod(s)}
                         isFav={favorites.vod.has(String(s.stream_id))}
                         onToggleFav={() => toggleFavVod(s.stream_id)}
                       />
@@ -423,7 +491,7 @@ export function Dashboard({ creds, serverName, onLogout }: DashboardProps) {
             <VideoPlayer
               src={
                 playing.kind === "live"
-                  ? Xtream.liveStreamUrl(creds, playing.streamId, "m3u8")
+                  ? Xtream.liveStreamUrl(creds, playing.streamId, settings.liveFormat)
                   : Xtream.vodStreamUrl(creds, playing.streamId, playing.container)
               }
               mode={playing.kind === "live" ? "hls" : "auto"}
@@ -443,6 +511,23 @@ export function Dashboard({ creds, serverName, onLogout }: DashboardProps) {
           onClose={() => setSelectedSeries(null)}
         />
       )}
+
+      {/* EPG modal */}
+      {epgStream && (
+        <EpgModal
+          creds={creds}
+          stream={epgStream}
+          onClose={() => setEpgStream(null)}
+        />
+      )}
+
+      {/* Settings dialog */}
+      <SettingsDialog
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        settings={settings}
+        onSave={handleSaveSettings}
+      />
     </div>
   );
 }
@@ -528,57 +613,70 @@ function MobileCategorySelect({
 function LiveCard({
   stream,
   onPlay,
+  onShowEpg,
   isFav,
   onToggleFav,
 }: {
   stream: LiveStream;
   onPlay: () => void;
+  onShowEpg: () => void;
   isFav: boolean;
   onToggleFav: () => void;
 }) {
   return (
-    <button
-      onClick={onPlay}
-      className="group relative text-left bg-zinc-900 rounded-lg overflow-hidden hover:ring-2 hover:ring-rose-500 transition"
-    >
-      <div className="aspect-square bg-zinc-800 flex items-center justify-center p-3">
-        {stream.stream_icon ? (
-          <img
-            src={stream.stream_icon}
-            alt={stream.name}
-            className="max-w-full max-h-full object-contain"
-            loading="lazy"
-            onError={(e) => {
-              (e.target as HTMLImageElement).style.display = "none";
-            }}
-          />
-        ) : (
-          <Tv className="w-8 h-8 text-zinc-600" />
-        )}
+    <div className="group relative text-left bg-zinc-900 rounded-lg overflow-hidden hover:ring-2 hover:ring-rose-500 transition">
+      <button onClick={onPlay} className="block w-full text-left">
+        <div className="aspect-square bg-zinc-800 flex items-center justify-center p-3">
+          {stream.stream_icon ? (
+            <img
+              src={stream.stream_icon}
+              alt={stream.name}
+              className="max-w-full max-h-full object-contain"
+              loading="lazy"
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.display = "none";
+              }}
+            />
+          ) : (
+            <Tv className="w-8 h-8 text-zinc-600" />
+          )}
+        </div>
+        <div className="p-2">
+          <p className="text-xs text-white line-clamp-2 leading-tight">{stream.name}</p>
+        </div>
+      </button>
+
+      {/* Action buttons (top-right) */}
+      <div className="absolute top-1.5 right-1.5 flex gap-1 opacity-0 group-hover:opacity-100 transition">
+        <button
+          onClick={onShowEpg}
+          aria-label="Show program guide"
+          title="Program guide"
+          className="p-1 rounded-full bg-black/60 backdrop-blur text-white/80 hover:text-white cursor-pointer"
+        >
+          <Calendar className="w-3.5 h-3.5" />
+        </button>
+        <button
+          onClick={onToggleFav}
+          aria-label={isFav ? "Remove from favorites" : "Add to favorites"}
+          title="Favorites"
+          className={`p-1 rounded-full bg-black/60 backdrop-blur cursor-pointer ${
+            isFav ? "text-rose-500" : "text-white/80 hover:text-white"
+          }`}
+        >
+          <Star className={`w-3.5 h-3.5 ${isFav ? "fill-current" : ""}`} />
+        </button>
       </div>
-      <div className="p-2">
-        <p className="text-xs text-white line-clamp-2 leading-tight">{stream.name}</p>
-      </div>
-      <span
-        role="button"
-        tabIndex={0}
-        onClick={(e) => {
-          e.stopPropagation();
-          onToggleFav();
-        }}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.stopPropagation();
-            onToggleFav();
-          }
-        }}
-        className={`absolute top-1.5 right-1.5 p-1 rounded-full bg-black/50 backdrop-blur cursor-pointer ${
-          isFav ? "text-rose-500" : "text-white/60 opacity-0 group-hover:opacity-100"
-        }`}
-      >
-        <Star className={`w-3.5 h-3.5 ${isFav ? "fill-current" : ""}`} />
-      </span>
-    </button>
+
+      {/* Always-visible star if favorited */}
+      {isFav && (
+        <span className="absolute top-1.5 right-1.5 group-hover:opacity-0 transition pointer-events-none">
+          <span className="block p-1 rounded-full bg-black/60 backdrop-blur text-rose-500">
+            <Star className="w-3.5 h-3.5 fill-current" />
+          </span>
+        </span>
+      )}
+    </div>
   );
 }
 

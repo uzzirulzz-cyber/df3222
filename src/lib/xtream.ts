@@ -175,6 +175,25 @@ export interface SeriesInfo {
   episodes: { [season: string]: SeriesInfoEpisode[] };
 }
 
+export interface EpgProgram {
+  id?: string;
+  title: string;
+  description: string;
+  start: string; // ISO timestamp or epoch string
+  end: string;
+  start_timestamp?: string;
+  stop_timestamp?: string;
+  category?: string;
+  image?: string;
+  language?: string;
+}
+
+export interface ShortEpgResponse {
+  epg_listings: EpgProgram[];
+}
+
+export type LiveStreamFormat = "m3u8" | "ts";
+
 function normalizeHost(host: string): string {
   let h = host.trim();
   if (!h) return h;
@@ -281,10 +300,29 @@ export const Xtream = {
   },
 
   /**
-   * Build a stream URL for a live channel.
-   * Format: {host}/live/{user}/{pass}/{stream_id}.m3u8 (or .ts)
+   * Short EPG for a single live stream (next N programs).
    */
-  liveStreamUrl(creds: XtreamCredentials, streamId: number, ext: "m3u8" | "ts" = "m3u8"): string {
+  getShortEpg(
+    creds: XtreamCredentials,
+    streamId: number,
+    limit: number = 5
+  ): Promise<ShortEpgResponse> {
+    return callApi<ShortEpgResponse>(creds, {
+      action: "get_short_epg",
+      stream_id: streamId,
+      limit,
+    });
+  },
+
+  /**
+   * Build a stream URL for a live channel.
+   * Format: {host}/live/{user}/{pass}/{stream_id}.{ext}
+   */
+  liveStreamUrl(
+    creds: XtreamCredentials,
+    streamId: number,
+    ext: LiveStreamFormat = "m3u8"
+  ): string {
     const host = normalizeHost(creds.host);
     return `${host}/live/${creds.username}/${creds.password}/${streamId}.${ext}`;
   },
