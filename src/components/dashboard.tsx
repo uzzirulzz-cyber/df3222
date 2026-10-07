@@ -22,6 +22,7 @@ import {
   myList,
   type IptvSettings,
 } from "@/lib/storage";
+import { proxyStreamUrl } from "@/lib/stream-proxy";
 import { VideoPlayer } from "./video-player";
 import { SeriesDetail } from "./series-detail";
 import { SettingsDialog } from "./settings-dialog";
@@ -651,8 +652,12 @@ export function Dashboard({ creds, serverName, onLogout }: DashboardProps) {
             <VideoPlayer
               src={
                 playing.kind === "live"
-                  ? Xtream.liveStreamUrl(creds, playing.streamId, settings.liveFormat)
-                  : Xtream.vodStreamUrl(creds, playing.streamId, playing.container)
+                  ? proxyStreamUrl(
+                      Xtream.liveStreamUrl(creds, playing.streamId, settings.liveFormat)
+                    )
+                  : proxyStreamUrl(
+                      Xtream.vodStreamUrl(creds, playing.streamId, playing.container)
+                    )
               }
               mode={playing.kind === "live" ? "hls" : "auto"}
               poster={playing.icon}

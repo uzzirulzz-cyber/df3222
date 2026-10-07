@@ -1,0 +1,9 @@
+# Dependencies
+node_modules/
+
+# Local config (contains account_id — don't commit)
+wrangler.toml
+
+# Logs
+*.log
+.wrangler/

@@ -8,6 +8,7 @@ import { X, Play, Loader2 } from "lucide-react";
 import type { XtreamCredentials, SeriesItem, SeriesInfo } from "@/lib/xtream";
 import { Xtream } from "@/lib/xtream";
 import { proxyImageUrl } from "@/lib/image-proxy";
+import { proxyStreamUrl } from "@/lib/stream-proxy";
 import { VideoPlayer } from "./video-player";
 
 interface SeriesDetailProps {
@@ -185,7 +186,9 @@ export function SeriesDetail({ creds, series, onClose }: SeriesDetailProps) {
               </Button>
             </div>
             <VideoPlayer
-              src={Xtream.seriesStreamUrl(creds, playing.episodeId, playing.container)}
+              src={proxyStreamUrl(
+                Xtream.seriesStreamUrl(creds, playing.episodeId, playing.container)
+              )}
               mode="auto"
               title={playing.title}
               onClose={() => setPlaying(null)}
