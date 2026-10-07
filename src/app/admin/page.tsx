@@ -3,32 +3,29 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { LoginScreen } from "@/components/login-screen";
-import { loadCreds } from "@/lib/storage";
+import { Dashboard } from "@/components/dashboard";
+import { loadCreds, loadAuthInfo, clearCreds, type StoredAuthInfo } from "@/lib/storage";
+import type { XtreamCredentials } from "@/lib/xtream";
 
 export default function AdminPage() {
   const router = useRouter();
   const [hydrated, setHydrated] = useState(false);
-  const [alreadyLoggedIn, setAlreadyLoggedIn] = useState(false);
+  const [creds, setCreds] = useState<XtreamCredentials | null>(null);
+  const [authInfo, setAuthInfo] = useState<StoredAuthInfo | null>(null);
 
   useEffect(() => {
-    // If already logged in, redirect to / (the storefront/dashboard)
     const saved = loadCreds();
+    const auth = loadAuthInfo();
     if (saved) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setAlreadyLoggedIn(true);
+      setCreds(saved);
+      setAuthInfo(auth);
     }
     setHydrated(true);
   }, []);
 
-  // Redirect to / if already logged in
-  useEffect(() => {
-    if (hydrated && alreadyLoggedIn) {
-      router.replace("/");
-    }
-  }, [hydrated, alreadyLoggedIn, router]);
-
   // Loading state
-  if (!hydrated || alreadyLoggedIn) {
+  if (!hydrated) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--iptv-bg)" }}>
         <div className="flex flex-col items-center gap-4">
@@ -43,11 +40,32 @@ export default function AdminPage() {
     );
   }
 
+  // If already logged in, show the full Dashboard (the actual IPTV player)
+  if (creds) {
+    return (
+      <Dashboard
+        creds={creds}
+        serverName={authInfo?.serverUrl || creds.host}
+        onLogout={() => {
+          clearCreds();
+          setCreds(null);
+          setAuthInfo(null);
+          // Stay on /admin, show the login form again
+          window.location.reload();
+        }}
+      />
+    );
+  }
+
+  // Not logged in — show the login form.
+  // After successful login, LoginScreen calls onLoggedIn which redirects to "/" —
+  // but we want to stay on /admin and show the dashboard. So we use a full page
+  // reload to re-run the effect above.
   return (
     <LoginScreen
       onLoggedIn={() => {
-        // After successful login, redirect to the storefront dashboard
-        router.replace("/");
+        // Reload the page so the effect picks up the newly-saved credentials
+        window.location.reload();
       }}
     />
   );

@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tv, Loader2, AlertCircle, ShieldCheck, Eye, EyeOff, Lock } from "lucide-react";
 import { Xtream, type XtreamCredentials } from "@/lib/xtream";
-import { saveCreds } from "@/lib/storage";
+import { saveCreds, saveAuthInfo, type StoredAuthInfo } from "@/lib/storage";
 
 interface LoginScreenProps {
   onLoggedIn: (creds: XtreamCredentials, serverName: string) => void;
@@ -48,6 +48,23 @@ export function LoginScreen({ onLoggedIn }: LoginScreenProps) {
       }
 
       saveCreds(creds);
+
+      // Save auth info for display in the dashboard (VIP user, renewal date, etc.)
+      const authInfo: StoredAuthInfo = {
+        username: auth.user_info.username || username,
+        expDate: auth.user_info.exp_date,
+        status: auth.user_info.status || "Active",
+        maxConnections: auth.user_info.max_connections || "1",
+        activeCons: auth.user_info.active_cons || "0",
+        createdAt: auth.user_info.created_at || "",
+        isTrial: auth.user_info.is_trial || "0",
+        serverUrl: auth.server_info?.url || host,
+        serverProtocol: auth.server_info?.server_protocol || "http",
+        timezone: auth.server_info?.timezone || "UTC",
+        storedAt: Date.now(),
+      };
+      saveAuthInfo(authInfo);
+
       onLoggedIn(creds, auth.server_info?.url || host);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Unknown error";
@@ -70,15 +87,18 @@ export function LoginScreen({ onLoggedIn }: LoginScreenProps) {
           </button>
           <div className="flex items-center gap-2 mb-1">
             <h1 className="text-2xl font-bold tracking-tight">
-              <span className="iptv-text-gold">IPTV</span>
-              <span className="text-white"> PRO</span>
+              <span className="text-[var(--iptv-gold)]">.</span>
+              <span className="text-white">live</span>
             </h1>
+            <span className="text-[9px] uppercase tracking-widest text-[var(--iptv-neon)] font-bold">
+              NovaStream IPTV
+            </span>
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[var(--iptv-gold)]/15 border border-[var(--iptv-gold)]/30 text-[var(--iptv-gold)] text-[10px] font-bold uppercase tracking-widest">
               <Lock className="w-2.5 h-2.5" /> Admin
             </span>
           </div>
           <p className="text-sm text-[var(--iptv-text-muted)] mt-1">
-            Sign in to access your IPTV dashboard
+            Connect to your Xtream Codes gateway
           </p>
         </div>
 

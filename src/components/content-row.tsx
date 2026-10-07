@@ -10,6 +10,11 @@ interface ContentRowProps {
   children: React.ReactNode;
   /** When empty, hide the row entirely */
   isEmpty?: boolean;
+  /** Optional badge text (e.g. "TOP 10", "TRENDING", "NEW") */
+  badge?: string;
+  badgeAccent?: "gold" | "neon" | "red" | "green";
+  /** Optional subtitle */
+  subtitle?: string;
 }
 
 const ACCENT_MAP: Record<string, string> = {
@@ -19,12 +24,22 @@ const ACCENT_MAP: Record<string, string> = {
   green: "text-[var(--iptv-green)]",
 };
 
+const BADGE_STYLES: Record<string, string> = {
+  gold: "bg-[var(--iptv-gold)]/15 border-[var(--iptv-gold)]/30 text-[var(--iptv-gold)]",
+  neon: "bg-[var(--iptv-neon)]/15 border-[var(--iptv-neon)]/30 text-[var(--iptv-neon)]",
+  red: "bg-[var(--iptv-red)]/15 border-[var(--iptv-red)]/30 text-[var(--iptv-red)]",
+  green: "bg-[var(--iptv-green)]/15 border-[var(--iptv-green)]/30 text-[var(--iptv-green)]",
+};
+
 export function ContentRow({
   title,
   icon,
   accent = "gold",
   children,
   isEmpty,
+  badge,
+  badgeAccent = "gold",
+  subtitle,
 }: ContentRowProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -39,10 +54,22 @@ export function ContentRow({
   return (
     <section className="group/row">
       <div className="flex items-center justify-between mb-3">
-        <h2 className="flex items-center gap-2 text-base sm:text-lg font-bold text-white">
-          {icon && <span className={ACCENT_MAP[accent]}>{icon}</span>}
-          {title}
-        </h2>
+        <div className="flex items-center gap-2">
+          <h2 className="flex items-center gap-2 text-base sm:text-lg font-bold text-white">
+            {icon && <span className={ACCENT_MAP[accent]}>{icon}</span>}
+            {title}
+          </h2>
+          {badge && (
+            <span className={`px-2 py-0.5 rounded-md border text-[9px] font-bold uppercase tracking-widest ${BADGE_STYLES[badgeAccent]}`}>
+              {badge}
+            </span>
+          )}
+          {subtitle && (
+            <span className="hidden sm:block text-xs text-[var(--iptv-text-dim)] ml-2">
+              {subtitle}
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-1 opacity-0 group-hover/row:opacity-100 transition">
           <button
             onClick={() => scrollBy(-1)}

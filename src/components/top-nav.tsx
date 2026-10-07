@@ -21,6 +21,8 @@ import {
   Server,
   Menu,
   X,
+  Sparkles,
+  Activity,
 } from "lucide-react";
 
 export type NavTab =
@@ -42,6 +44,10 @@ interface TopNavProps {
   liveFormat: string;
   onOpenSettings: () => void;
   onLogout: () => void;
+  vipUser?: string;
+  renewalDate?: string;
+  ping?: string;
+  bitrate?: string;
 }
 
 const NAV_ITEMS: { id: NavTab; label: string; icon: React.ReactNode }[] = [
@@ -64,6 +70,10 @@ export function TopNav({
   liveFormat,
   onOpenSettings,
   onLogout,
+  vipUser,
+  renewalDate,
+  ping,
+  bitrate,
 }: TopNavProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -79,16 +89,32 @@ export function TopNav({
           >
             <div className="relative w-9 h-9 rounded-lg bg-gradient-to-br from-[var(--iptv-gold-bright)] to-[var(--iptv-gold-dim)] flex items-center justify-center shadow-[0_0_20px_rgba(245,184,0,0.4)] group-hover:shadow-[0_0_28px_rgba(245,184,0,0.7)] transition-shadow">
               <Tv className="w-5 h-5 text-[#0a0a14]" />
+              <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-[var(--iptv-green)] iptv-pulse border border-[var(--iptv-bg)]" />
             </div>
             <div className="hidden sm:block">
-              <p className="text-base font-bold tracking-tight leading-none">
-                <span className="iptv-text-gold">IPTV</span>
-                <span className="text-white"> PRO</span>
-              </p>
-              <p className="text-[10px] text-[var(--iptv-text-dim)] mt-0.5 flex items-center gap-1">
-                <Server className="w-2.5 h-2.5" />
-                {serverName.replace(/^https?:\/\//, "").slice(0, 24)}
-                <span className="ml-1 px-1 py-0.5 rounded bg-[var(--iptv-surface)] text-[var(--iptv-gold)] font-semibold uppercase text-[9px]">
+              <div className="flex items-baseline gap-1.5">
+                <p className="text-base font-bold tracking-tight leading-none">
+                  <span className="text-[var(--iptv-gold)]">.</span>
+                  <span className="text-white">live</span>
+                </p>
+                <span className="text-[9px] uppercase tracking-widest text-[var(--iptv-neon)] font-bold flex items-center gap-0.5">
+                  <Sparkles className="w-2.5 h-2.5" /> AI CineMatch
+                </span>
+              </div>
+              <p className="text-[10px] text-[var(--iptv-text-dim)] mt-0.5 flex items-center gap-1.5">
+                <span className="flex items-center gap-0.5">
+                  <Server className="w-2.5 h-2.5" />
+                  {serverName.replace(/^https?:\/\//, "").slice(0, 20)}
+                </span>
+                {ping && (
+                  <span className="flex items-center gap-0.5 text-[var(--iptv-green)]">
+                    <Activity className="w-2.5 h-2.5" />{ping}
+                  </span>
+                )}
+                {bitrate && (
+                  <span className="text-[var(--iptv-neon)]">{bitrate}</span>
+                )}
+                <span className="px-1 py-0.5 rounded bg-[var(--iptv-surface)] text-[var(--iptv-gold)] font-semibold uppercase text-[9px]">
                   {liveFormat}
                 </span>
               </p>

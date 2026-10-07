@@ -17,6 +17,21 @@ const FAV_SERIES_KEY = "iptv:fav:series";
 const SETTINGS_KEY = "iptv:settings";
 const WATCH_HISTORY_KEY = "iptv:history";
 const MY_LIST_KEY = "iptv:mylist";
+const AUTH_INFO_KEY = "iptv:auth";
+
+export interface StoredAuthInfo {
+  username: string;
+  expDate: string | null;
+  status: string;
+  maxConnections: string;
+  activeCons: string;
+  createdAt: string;
+  isTrial: string;
+  serverUrl: string;
+  serverProtocol: string;
+  timezone: string;
+  storedAt: number;
+}
 
 export interface WatchHistoryEntry {
   id: string;
@@ -63,6 +78,23 @@ export function saveCreds(creds: XtreamCredentials) {
 export function clearCreds() {
   if (typeof window === "undefined") return;
   localStorage.removeItem(CREDS_KEY);
+  localStorage.removeItem(AUTH_INFO_KEY);
+}
+
+export function saveAuthInfo(info: StoredAuthInfo) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(AUTH_INFO_KEY, JSON.stringify(info));
+}
+
+export function loadAuthInfo(): StoredAuthInfo | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(AUTH_INFO_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as StoredAuthInfo;
+  } catch {
+    return null;
+  }
 }
 
 export function loadSettings(): IptvSettings {

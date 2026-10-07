@@ -16,6 +16,8 @@ import {
   History,
   ListPlus,
   Clock,
+  Baby,
+  Clapperboard,
 } from "lucide-react";
 import type {
   Category,
@@ -30,6 +32,7 @@ import { ContentRow, RowItem } from "./content-row";
 import { ContentCard } from "./content-card";
 import { HeroBanner, type HeroSlide } from "./hero-banner";
 import { LiveSportsPanel } from "./live-sports-panel";
+import { PremiumShowcase, DeviceCompatibility } from "./showcase-sections";
 
 interface HomeTabProps {
   creds: XtreamCredentials;
@@ -50,6 +53,11 @@ interface HomeTabProps {
   onToggleFavSeries: (id: number) => void;
   onToggleList: (item: { id: string; kind: "live" | "vod" | "series"; title: string; icon?: string }) => void;
   onGoToTab: (tab: "live" | "vod" | "series" | "sports" | "music" | "kids" | "genres") => void;
+  vipUser?: string;
+  renewalDate?: string;
+  ping?: string;
+  bitrate?: string;
+  onOpenSettings?: () => void;
 }
 
 const ROW_SIZE = 18;
@@ -91,6 +99,11 @@ export function HomeTab(props: HomeTabProps) {
     onToggleFavSeries,
     onToggleList,
     onGoToTab,
+    vipUser,
+    renewalDate,
+    ping,
+    bitrate,
+    onOpenSettings,
   } = props;
 
   const data = useMemo(() => {
@@ -263,6 +276,13 @@ export function HomeTab(props: HomeTabProps) {
           onToggleList({ id: slide.id, kind: slide.kind, title: slide.title, icon: slide.backdrop })
         }
         isAdded={isHeroAdded}
+        vipUser={vipUser}
+        renewalDate={renewalDate}
+        serverName={creds.host}
+        ping={ping}
+        bitrate={bitrate}
+        onOpenSettings={onOpenSettings}
+        onOpenEpg={() => onGoToTab("live")}
       />
 
       {/* LIVE SPORTS PANEL (only if we have sports content) */}
@@ -386,6 +406,9 @@ export function HomeTab(props: HomeTabProps) {
         title="Popular Now"
         icon={<Flame className="w-5 h-5" />}
         accent="red"
+        badge="TOP 10"
+        badgeAccent="gold"
+        subtitle="Most-watched 4K titles streamed worldwide today"
         isEmpty={data.popularLive.length === 0}
       >
         {data.popularLive.map((s) => (
@@ -408,9 +431,12 @@ export function HomeTab(props: HomeTabProps) {
 
       {/* 2. TRENDING */}
       <ContentRow
-        title="Trending"
+        title="Trending Now"
         icon={<TrendingUp className="w-5 h-5" />}
         accent="gold"
+        badge="TRENDING"
+        badgeAccent="neon"
+        subtitle="The 5 blockbuster titles trending across all IPTV networks today"
         isEmpty={data.trending.length === 0}
       >
         {data.trending.map((s) => (
@@ -435,6 +461,9 @@ export function HomeTab(props: HomeTabProps) {
         title="New Releases"
         icon={<Sparkles className="w-5 h-5" />}
         accent="neon"
+        badge="NEW"
+        badgeAccent="red"
+        subtitle="Freshly added high-bitrate masters and episodic releases"
         isEmpty={data.newReleases.length === 0}
       >
         {data.newReleases.map((s) => (
@@ -459,6 +488,7 @@ export function HomeTab(props: HomeTabProps) {
         title="All-Time Hits"
         icon={<Star className="w-5 h-5" />}
         accent="gold"
+        subtitle="Critically acclaimed cinematic masterworks and hall-of-fame releases"
         isEmpty={data.allTimeHits.length === 0}
       >
         {data.allTimeHits.map((s) => (
@@ -478,12 +508,18 @@ export function HomeTab(props: HomeTabProps) {
         ))}
       </ContentRow>
 
+      {/* PREMIUM STREAMING SHOWCASE — mid-page banner */}
+      <PremiumShowcase />
+
       {/* 5. MUSIC */}
       {(data.musicLive.length > 0 || data.musicVod.length > 0) && (
         <ContentRow
-          title={data.musicCatName || "Music"}
+          title={data.musicCatName || "Music & Live Concerts"}
           icon={<Music className="w-5 h-5" />}
           accent="neon"
+          badge="ATMOS 5.1"
+          badgeAccent="gold"
+          subtitle="Electronic arenas, symphonies, and live festival stages in Dolby Atmos"
         >
           {data.musicLive.map((s) => (
             <RowItem key={`mus-l-${s.stream_id}`}>
@@ -513,9 +549,10 @@ export function HomeTab(props: HomeTabProps) {
 
       {/* 6. MOVIES (browse all) */}
       <ContentRow
-        title="Movies"
+        title="Movies & Blockbusters"
         icon={<Film className="w-5 h-5" />}
         accent="gold"
+        subtitle="Action, thriller, sci-fi, and adventure blockbusters in native 4K"
         isEmpty={vodStreams.length === 0}
       >
         {vodStreams.slice(0, ROW_SIZE).map((s) => (
@@ -537,9 +574,10 @@ export function HomeTab(props: HomeTabProps) {
 
       {/* 7. TV SERIES */}
       <ContentRow
-        title="TV Series"
+        title="TV Series & Originals"
         icon={<MonitorPlay className="w-5 h-5" />}
         accent="neon"
+        subtitle="Bingeable high-budget episodic storytelling with full seasonal drops"
         isEmpty={data.tvSeries.length === 0}
       >
         {data.tvSeries.map((s) => (
@@ -563,9 +601,10 @@ export function HomeTab(props: HomeTabProps) {
       {/* 8. SPORTS */}
       {data.sportsLive.length > 0 && (
         <ContentRow
-          title={data.sportsCatName || "Sports"}
+          title={data.sportsCatName || "Sports Highlights & Documentaries"}
           icon={<Trophy className="w-5 h-5" />}
           accent="red"
+          subtitle="Relive historic tournament finals and motorsport spectacles"
         >
           {data.sportsLive.slice(0, ROW_SIZE).map((s) => (
             <RowItem key={`sprt-${s.stream_id}`}>
@@ -585,9 +624,10 @@ export function HomeTab(props: HomeTabProps) {
       {/* 9. DRAMA */}
       {data.dramaVod.length > 0 && (
         <ContentRow
-          title="Drama"
+          title="Drama & Emotion"
           icon={<Heart className="w-5 h-5" />}
           accent="red"
+          subtitle="Deep character studies, investigative courtrooms, and passionate narratives"
         >
           {data.dramaVod.map((s) => (
             <RowItem key={`drm-${s.stream_id}`}>
@@ -606,9 +646,12 @@ export function HomeTab(props: HomeTabProps) {
       {/* KIDS (bonus) */}
       {data.kidsLive.length > 0 && (
         <ContentRow
-          title={data.kidsCatName || "Kids"}
-          icon={<Sparkles className="w-5 h-5" />}
+          title={data.kidsCatName || "Kids & Family Animation"}
+          icon={<Baby className="w-5 h-5" />}
           accent="gold"
+          badge="ALL AGES"
+          badgeAccent="neon"
+          subtitle="Enchanting cosmic adventures, friendly robot quests, and sing-alongs"
         >
           {data.kidsLive.map((s) => (
             <RowItem key={`kid-${s.stream_id}`}>
@@ -625,12 +668,18 @@ export function HomeTab(props: HomeTabProps) {
         </ContentRow>
       )}
 
+      {/* UNIVERSAL DEVICE COMPATIBILITY */}
+      <DeviceCompatibility />
+
       {/* 10. ALL GENRES — quick links grid */}
       <section>
-        <h2 className="flex items-center gap-2 text-base sm:text-lg font-bold text-white mb-3">
+        <h2 className="flex items-center gap-2 text-base sm:text-lg font-bold text-white mb-1">
           <Grid2x2 className="w-5 h-5 text-[var(--iptv-gold)]" />
-          All Genres
+          All Genres & Catalog Categories
         </h2>
+        <p className="text-xs text-[var(--iptv-text-muted)] mb-4">
+          Explore over 80,000 titles organized by cinematic genre
+        </p>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5">
           {liveCategories.slice(0, 24).map((c) => (
             <button

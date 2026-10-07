@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Play, Plus, Check, Star, Calendar, Clock, Info } from "lucide-react";
+import { Play, Plus, Check, Star, Calendar, Clock, Info, Server, Activity, Wifi, Crown, Radio, Settings2, CalendarDays } from "lucide-react";
 import { proxyImageUrl } from "@/lib/image-proxy";
 
 export interface HeroSlide {
@@ -22,9 +22,28 @@ interface HeroBannerProps {
   onWatch: (slide: HeroSlide) => void;
   onAddToList: (slide: HeroSlide) => void;
   isAdded: (slide: HeroSlide) => boolean;
+  vipUser?: string;
+  renewalDate?: string;
+  serverName?: string;
+  ping?: string;
+  bitrate?: string;
+  onOpenSettings?: () => void;
+  onOpenEpg?: () => void;
 }
 
-export function HeroBanner({ slides, onWatch, onAddToList, isAdded }: HeroBannerProps) {
+export function HeroBanner({
+  slides,
+  onWatch,
+  onAddToList,
+  isAdded,
+  vipUser,
+  renewalDate,
+  serverName,
+  ping,
+  bitrate,
+  onOpenSettings,
+  onOpenEpg,
+}: HeroBannerProps) {
   const [index, setIndex] = useState(0);
 
   // Auto-rotate every 10s
@@ -43,7 +62,7 @@ export function HeroBanner({ slides, onWatch, onAddToList, isAdded }: HeroBanner
           <div className="w-16 h-16 mx-auto mb-3 rounded-full bg-gradient-to-br from-[var(--iptv-gold)] to-[var(--iptv-gold-dim)] flex items-center justify-center shadow-[0_0_30px_rgba(245,184,0,0.4)]">
             <Play className="w-7 h-7 text-[#0a0a14] fill-current ml-0.5" />
           </div>
-          <p className="text-white text-lg font-semibold">Welcome to IPTV Pro</p>
+          <p className="text-white text-lg font-semibold">Welcome to .live</p>
           <p className="text-[var(--iptv-text-muted)] text-sm mt-1">
             Loading featured content…
           </p>
@@ -74,8 +93,69 @@ export function HeroBanner({ slides, onWatch, onAddToList, isAdded }: HeroBanner
       {/* Gradient overlay for readability */}
       <div className="absolute inset-0 iptv-hero-overlay" />
 
+      {/* Top server info bar */}
+      <div className="absolute top-0 left-0 right-0 p-4 sm:p-6 flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-2 text-[10px] sm:text-xs">
+          <span className="px-2 py-1 rounded-md bg-[var(--iptv-gold)]/15 border border-[var(--iptv-gold)]/30 text-[var(--iptv-gold)] font-semibold uppercase tracking-wider flex items-center gap-1">
+            <Server className="w-3 h-3" /> Playbeat Gateway
+          </span>
+          {serverName && (
+            <span className="text-[var(--iptv-text-muted)] hidden sm:inline">
+              · {serverName.replace(/^https?:\/\//, "")}
+            </span>
+          )}
+          {ping && (
+            <span className="flex items-center gap-1 text-[var(--iptv-green)] font-medium">
+              <Activity className="w-3 h-3" />{ping}
+            </span>
+          )}
+          {bitrate && (
+            <span className="text-[var(--iptv-neon)] font-medium">{bitrate}</span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {vipUser && (
+            <span className="px-2 py-1 rounded-md bg-[var(--iptv-neon)]/15 border border-[var(--iptv-neon)]/30 text-[var(--iptv-neon)] text-[10px] sm:text-xs font-semibold flex items-center gap-1">
+              <Crown className="w-3 h-3" /> VIP: {vipUser}
+            </span>
+          )}
+          {renewalDate && (
+            <span className="text-[10px] sm:text-xs text-[var(--iptv-text-muted)] flex items-center gap-1">
+              <CalendarDays className="w-3 h-3" />Renewal: {renewalDate}
+            </span>
+          )}
+          {onOpenSettings && (
+            <button
+              onClick={onOpenSettings}
+              className="px-2.5 py-1 rounded-md bg-white/10 border border-white/20 text-white text-[10px] sm:text-xs font-medium hover:bg-white/20 transition flex items-center gap-1"
+            >
+              <Settings2 className="w-3 h-3" /> Proxy
+            </button>
+          )}
+          {onOpenEpg && (
+            <button
+              onClick={onOpenEpg}
+              className="px-2.5 py-1 rounded-md bg-white/10 border border-white/20 text-white text-[10px] sm:text-xs font-medium hover:bg-white/20 transition flex items-center gap-1"
+            >
+              <Radio className="w-3 h-3" /> EPG Guide
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* Content */}
       <div className="relative h-full flex flex-col justify-end p-6 sm:p-10 lg:p-14 max-w-2xl">
+        {/* Featured premiere tag */}
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-[10px] uppercase tracking-widest text-[var(--iptv-gold)] font-bold flex items-center gap-1">
+            <Star className="w-3 h-3 fill-current" /> Featured Premiere
+          </span>
+          <span className="text-[10px] text-[var(--iptv-text-dim)]">·</span>
+          <span className="text-[10px] uppercase tracking-widest text-[var(--iptv-neon)] font-semibold">
+            4K HDR · Dolby Atmos
+          </span>
+        </div>
+
         {/* Badges */}
         <div className="flex items-center gap-2 mb-3">
           {slide.kind === "live" && (
@@ -85,7 +165,7 @@ export function HeroBanner({ slides, onWatch, onAddToList, isAdded }: HeroBanner
             </span>
           )}
           {slide.genre && (
-            <span className="text-[10px] uppercase tracking-widest text-[var(--iptv-gold)] font-semibold">
+            <span className="text-[10px] uppercase tracking-widest text-[var(--iptv-text-muted)] font-medium">
               {slide.genre}
             </span>
           )}
@@ -108,7 +188,7 @@ export function HeroBanner({ slides, onWatch, onAddToList, isAdded }: HeroBanner
           {slide.rating && slide.rating > 0 && (
             <span className="flex items-center gap-1 text-[var(--iptv-gold)] font-semibold">
               <Star className="w-3.5 h-3.5 fill-current" />
-              {slide.rating.toFixed(1)}
+              {slide.rating.toFixed(1)} / 10
             </span>
           )}
           {slide.year && (
@@ -121,10 +201,13 @@ export function HeroBanner({ slides, onWatch, onAddToList, isAdded }: HeroBanner
               <Clock className="w-3.5 h-3.5" /> {slide.duration}
             </span>
           )}
+          {slide.genre && (
+            <span className="text-[var(--iptv-neon)]">{slide.genre}</span>
+          )}
         </div>
 
         {/* CTAs */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <button
             onClick={() => onWatch(slide)}
             className="iptv-btn-gold flex items-center gap-2 px-5 sm:px-7 py-2.5 sm:py-3 rounded-lg text-sm sm:text-base font-semibold"
@@ -138,7 +221,7 @@ export function HeroBanner({ slides, onWatch, onAddToList, isAdded }: HeroBanner
           >
             {isAdded(slide) ? (
               <>
-                <Check className="w-4 h-4 text-[var(--iptv-green)]" /> Added
+                <Check className="w-4 h-4 text-[var(--iptv-green)]" /> In My List
               </>
             ) : (
               <>

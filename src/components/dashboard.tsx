@@ -18,9 +18,11 @@ import {
   favorites,
   loadSettings,
   saveSettings,
+  loadAuthInfo,
   history as watchHistory,
   myList,
   type IptvSettings,
+  type StoredAuthInfo,
 } from "@/lib/storage";
 import { proxyStreamUrl } from "@/lib/stream-proxy";
 import { VideoPlayer } from "./video-player";
@@ -78,6 +80,20 @@ export function Dashboard({ creds, serverName, onLogout }: DashboardProps) {
 
   const [settings, setSettings] = useState<IptvSettings>(() => loadSettings());
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [authInfo, setAuthInfo] = useState<StoredAuthInfo | null>(() => loadAuthInfo());
+
+  // Format expiry date for display
+  const renewalDate = useMemo(() => {
+    if (!authInfo?.expDate) return undefined;
+    const exp = Number(authInfo.expDate);
+    if (!exp || Number.isNaN(exp)) return undefined;
+    const d = new Date(exp * 1000);
+    return d.toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+  }, [authInfo]);
 
   // ----- Data loading -----
   useEffect(() => {
@@ -303,6 +319,10 @@ export function Dashboard({ creds, serverName, onLogout }: DashboardProps) {
         liveFormat={settings.liveFormat}
         onOpenSettings={() => setSettingsOpen(true)}
         onLogout={onLogout}
+        vipUser={authInfo?.username}
+        renewalDate={renewalDate}
+        ping="24ms"
+        bitrate="18.4 Mbps"
       />
 
       <main className="flex-1 flex flex-col">
@@ -425,6 +445,11 @@ export function Dashboard({ creds, serverName, onLogout }: DashboardProps) {
                   onToggleFavSeries={toggleFavSeries}
                   onToggleList={handleToggleList}
                   onGoToTab={(t) => setTab(t as NavTab)}
+                  vipUser={authInfo?.username}
+                  renewalDate={renewalDate}
+                  ping="24ms"
+                  bitrate="18.4 Mbps"
+                  onOpenSettings={() => setSettingsOpen(true)}
                 />
               )}
 
@@ -632,7 +657,12 @@ export function Dashboard({ creds, serverName, onLogout }: DashboardProps) {
         </div>
       </main>
 
-      <AppFooter serverName={serverName} />
+      <AppFooter
+        serverName={serverName}
+        vipUser={authInfo?.username}
+        renewalDate={renewalDate}
+        latency="24ms"
+      />
 
       {/* Player modal */}
       {playing && (
