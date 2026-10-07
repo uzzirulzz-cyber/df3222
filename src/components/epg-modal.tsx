@@ -7,6 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { X, Calendar, Radio, AlertCircle } from "lucide-react";
 import type { XtreamCredentials, LiveStream, EpgProgram } from "@/lib/xtream";
 import { Xtream } from "@/lib/xtream";
+import { proxyImageUrl } from "@/lib/image-proxy";
 
 interface EpgModalProps {
   creds: XtreamCredentials;
@@ -80,7 +81,7 @@ export function EpgModal({ creds, stream, onClose }: EpgModalProps) {
             <div className="w-10 h-10 rounded-md bg-zinc-800 flex items-center justify-center flex-shrink-0 overflow-hidden">
               {stream.stream_icon ? (
                 <img
-                  src={stream.stream_icon}
+                  src={proxyImageUrl(stream.stream_icon)}
                   alt=""
                   className="w-full h-full object-contain"
                   onError={(e) => {

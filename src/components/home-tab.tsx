@@ -25,6 +25,7 @@ import type {
   XtreamCredentials,
 } from "@/lib/xtream";
 import { favorites, history as watchHistory, myList } from "@/lib/storage";
+import { proxyImageUrl } from "@/lib/image-proxy";
 import { ContentRow, RowItem } from "./content-row";
 import { ContentCard } from "./content-card";
 import { HeroBanner, type HeroSlide } from "./hero-banner";
@@ -300,7 +301,7 @@ export function HomeTab(props: HomeTabProps) {
                 <div className="relative aspect-[2/3] bg-[var(--iptv-bg-elevated)] overflow-hidden">
                   {h.icon ? (
                     <img
-                      src={h.icon}
+                      src={proxyImageUrl(h.icon)}
                       alt={h.title}
                       className="w-full h-full object-cover"
                       onError={(e) => {
@@ -358,7 +359,7 @@ export function HomeTab(props: HomeTabProps) {
                 <div className="relative aspect-[2/3] bg-[var(--iptv-bg-elevated)] overflow-hidden">
                   {h.icon ? (
                     <img
-                      src={h.icon}
+                      src={proxyImageUrl(h.icon)}
                       alt={h.title}
                       className="w-full h-full object-cover"
                       onError={(e) => {

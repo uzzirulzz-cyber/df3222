@@ -7,6 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { X, Play, Loader2 } from "lucide-react";
 import type { XtreamCredentials, SeriesItem, SeriesInfo } from "@/lib/xtream";
 import { Xtream } from "@/lib/xtream";
+import { proxyImageUrl } from "@/lib/image-proxy";
 import { VideoPlayer } from "./video-player";
 
 interface SeriesDetailProps {
@@ -54,7 +55,7 @@ export function SeriesDetail({ creds, series, onClose }: SeriesDetailProps) {
           <div className="flex gap-4 min-w-0">
             {series.cover && (
               <img
-                src={series.cover}
+                src={proxyImageUrl(series.cover)}
                 alt={series.name}
                 className="w-20 h-28 object-cover rounded-md flex-shrink-0 bg-zinc-800"
                 onError={(e) => {

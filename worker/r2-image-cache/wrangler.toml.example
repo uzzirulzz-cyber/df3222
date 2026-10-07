@@ -1,0 +1,38 @@
+# Cloudflare Worker config for IPTV Image Cache
+#
+# HOW TO USE:
+# 1. Copy this file to `wrangler.toml` (don't commit the real one)
+# 2. Replace <YOUR_ACCOUNT_ID> with your Cloudflare account ID
+#    (find it at https://dash.cloudflare.com → any domain → right sidebar)
+# 3. Create an R2 bucket named "iptv-image-cache" (or change the bucket_name below)
+#    via dashboard: https://dash.cloudflare.com → R2 → Create bucket
+# 4. Run: npx wrangler deploy
+
+name = "iptv-image-cache"
+main = "src/index.ts"
+compatibility_date = "2024-12-01"
+compatibility_flags = ["nodejs_compat"]
+
+account_id = "<YOUR_ACCOUNT_ID>"
+
+# Bind the R2 bucket. The binding name `IMAGE_CACHE` must match `env.IMAGE_CACHE`
+# in src/index.ts.
+[[r2_buckets]]
+binding = "IMAGE_CACHE"
+bucket_name = "iptv-image-cache"
+# Optional: create a preview bucket for `wrangler dev`
+# preview_bucket_name = "iptv-image-cache-preview"
+
+# Optional: restrict which upstream hosts the worker will fetch from.
+# Comma-separated substring match. Leave commented to allow any host.
+# This is RECOMMENDED for production to prevent the worker being used as an
+# open proxy.
+# [vars]
+# UPSTREAM_ALLOWLIST = "playbeat.live,your-iptv-provider.com"
+# MAX_IMAGE_SIZE = "10485760"  # 10 MB in bytes
+
+# Optional: custom route on your domain
+# Replace with your domain — requires the domain to be on Cloudflare DNS
+# [[routes]]
+# pattern = "img.yourdomain.com/*"
+# custom_domain = true

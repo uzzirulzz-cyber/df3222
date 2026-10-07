@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Play, Plus, Check, Star, Calendar, Clock, Info } from "lucide-react";
+import { proxyImageUrl } from "@/lib/image-proxy";
 
 export interface HeroSlide {
   id: string;
@@ -59,7 +60,7 @@ export function HeroBanner({ slides, onWatch, onAddToList, isAdded }: HeroBanner
       {slide.backdrop ? (
         <img
           key={slide.id}
-          src={slide.backdrop}
+          src={proxyImageUrl(slide.backdrop)}
           alt={slide.title}
           className="absolute inset-0 w-full h-full object-cover transition-opacity duration-700"
           onError={(e) => {

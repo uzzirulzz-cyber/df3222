@@ -2,6 +2,7 @@
 
 import { Tv, Film, MonitorPlay, Play, Star, Calendar, Clock } from "lucide-react";
 import type { LiveStream, VodStream, SeriesItem } from "@/lib/xtream";
+import { proxyImageUrl } from "@/lib/image-proxy";
 
 export type CardKind = "live" | "vod" | "series";
 export type CardAspectRatio = "portrait" | "square";
@@ -91,7 +92,7 @@ export function ContentCard(props: ContentCardProps) {
   } = props;
 
   const title = getTitle(props);
-  const icon = getIcon(props);
+  const icon = proxyImageUrl(getIcon(props));
   const rating = getRating(props);
   const genre = getGenre(props);
   const year = getYear(props);

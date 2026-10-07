@@ -2,6 +2,7 @@
 
 import { Trophy, Radio, ChevronRight } from "lucide-react";
 import type { LiveStream } from "@/lib/xtream";
+import { proxyImageUrl } from "@/lib/image-proxy";
 
 interface LiveSportsPanelProps {
   /** Live channels filtered to sports categories */
@@ -52,7 +53,7 @@ export function LiveSportsPanel({ liveNow, onPlay, onShowAll }: LiveSportsPanelP
               <div className="w-10 h-10 rounded-md bg-[var(--iptv-bg-elevated)] flex items-center justify-center flex-shrink-0 overflow-hidden">
                 {s.stream_icon ? (
                   <img
-                    src={s.stream_icon}
+                    src={proxyImageUrl(s.stream_icon)}
                     alt=""
                     className="max-w-full max-h-full object-contain"
                     onError={(e) => {
