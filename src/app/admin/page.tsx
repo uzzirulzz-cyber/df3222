@@ -2,35 +2,33 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Dashboard } from "@/components/dashboard";
-import { loadCreds, clearCreds } from "@/lib/storage";
-import type { XtreamCredentials } from "@/lib/xtream";
+import { LoginScreen } from "@/components/login-screen";
+import { loadCreds } from "@/lib/storage";
 
-export default function Home() {
+export default function AdminPage() {
   const router = useRouter();
-  const [creds, setCreds] = useState<XtreamCredentials | null>(null);
-  const [serverName, setServerName] = useState<string>("");
   const [hydrated, setHydrated] = useState(false);
+  const [alreadyLoggedIn, setAlreadyLoggedIn] = useState(false);
 
   useEffect(() => {
+    // If already logged in, redirect to / (the storefront/dashboard)
     const saved = loadCreds();
     if (saved) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setCreds(saved);
-      setServerName(saved.host);
+      setAlreadyLoggedIn(true);
     }
     setHydrated(true);
   }, []);
 
-  // After hydration: if no creds, redirect to /admin (the login page)
+  // Redirect to / if already logged in
   useEffect(() => {
-    if (hydrated && !creds) {
-      router.replace("/admin");
+    if (hydrated && alreadyLoggedIn) {
+      router.replace("/");
     }
-  }, [hydrated, creds, router]);
+  }, [hydrated, alreadyLoggedIn, router]);
 
-  // Loading state (also covers the brief moment before redirect kicks in)
-  if (!hydrated || !creds) {
+  // Loading state
+  if (!hydrated || alreadyLoggedIn) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--iptv-bg)" }}>
         <div className="flex flex-col items-center gap-4">
@@ -46,14 +44,10 @@ export default function Home() {
   }
 
   return (
-    <Dashboard
-      creds={creds}
-      serverName={serverName}
-      onLogout={() => {
-        clearCreds();
-        setCreds(null);
-        setServerName("");
-        router.replace("/admin");
+    <LoginScreen
+      onLoggedIn={() => {
+        // After successful login, redirect to the storefront dashboard
+        router.replace("/");
       }}
     />
   );

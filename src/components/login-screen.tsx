@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tv, Loader2, AlertCircle, ShieldCheck, Eye, EyeOff } from "lucide-react";
+import { Tv, Loader2, AlertCircle, ShieldCheck, Eye, EyeOff, Lock } from "lucide-react";
 import { Xtream, type XtreamCredentials } from "@/lib/xtream";
 import { saveCreds } from "@/lib/storage";
 
@@ -14,6 +14,7 @@ interface LoginScreenProps {
 }
 
 export function LoginScreen({ onLoggedIn }: LoginScreenProps) {
+  const router = useRouter();
   const [host, setHost] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -57,29 +58,41 @@ export function LoginScreen({ onLoggedIn }: LoginScreenProps) {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-zinc-950 p-4">
+    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: "var(--iptv-bg)" }}>
       <div className="w-full max-w-md">
         <div className="flex flex-col items-center mb-8">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-rose-500 to-orange-500 flex items-center justify-center mb-4 shadow-lg shadow-rose-500/20">
-            <Tv className="w-8 h-8 text-white" />
+          <button
+            onClick={() => router.push("/")}
+            className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[var(--iptv-gold-bright)] to-[var(--iptv-gold-dim)] flex items-center justify-center mb-4 shadow-[0_0_30px_rgba(245,184,0,0.4)] hover:shadow-[0_0_40px_rgba(245,184,0,0.7)] transition-shadow"
+            aria-label="Back to home"
+          >
+            <Tv className="w-8 h-8 text-[#0a0a14]" />
+          </button>
+          <div className="flex items-center gap-2 mb-1">
+            <h1 className="text-2xl font-bold tracking-tight">
+              <span className="iptv-text-gold">IPTV</span>
+              <span className="text-white"> PRO</span>
+            </h1>
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[var(--iptv-gold)]/15 border border-[var(--iptv-gold)]/30 text-[var(--iptv-gold)] text-[10px] font-bold uppercase tracking-widest">
+              <Lock className="w-2.5 h-2.5" /> Admin
+            </span>
           </div>
-          <h1 className="text-2xl font-semibold text-white">Personal IPTV</h1>
-          <p className="text-sm text-zinc-400 mt-1">
-            Self-hosted Xtream Codes player
+          <p className="text-sm text-[var(--iptv-text-muted)] mt-1">
+            Sign in to access your IPTV dashboard
           </p>
         </div>
 
-        <Card className="bg-zinc-900 border-zinc-800">
-          <CardHeader>
-            <CardTitle className="text-white">Sign in</CardTitle>
-            <CardDescription className="text-zinc-400">
-              Enter your Xtream Codes credentials. They are stored only in this browser.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+        <div className="rounded-xl border border-[var(--iptv-border)] bg-[var(--iptv-surface)] overflow-hidden">
+          <div className="p-6 border-b border-[var(--iptv-border)]">
+            <h2 className="text-white text-lg font-semibold">Connect to Provider</h2>
+            <p className="text-xs text-[var(--iptv-text-muted)] mt-1">
+              Enter your Xtream Codes credentials. Stored only in this browser.
+            </p>
+          </div>
+          <div className="p-6">
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="host" className="text-zinc-200">
+                <Label htmlFor="host" className="text-[var(--iptv-text)]">
                   Server URL
                 </Label>
                 <Input
@@ -89,15 +102,15 @@ export function LoginScreen({ onLoggedIn }: LoginScreenProps) {
                   value={host}
                   onChange={(e) => setHost(e.target.value)}
                   autoComplete="url"
-                  className="bg-zinc-800 border-zinc-700 text-white placeholder-zinc-500"
+                  className="bg-[var(--iptv-bg-elevated)] border-[var(--iptv-border)] text-white placeholder:text-[var(--iptv-text-dim)] focus-visible:border-[var(--iptv-gold)]"
                 />
-                <p className="text-xs text-zinc-500">
+                <p className="text-xs text-[var(--iptv-text-dim)]">
                   Include the protocol and port. No trailing slash.
                 </p>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="username" className="text-zinc-200">
+                <Label htmlFor="username" className="text-[var(--iptv-text)]">
                   Username
                 </Label>
                 <Input
@@ -107,12 +120,12 @@ export function LoginScreen({ onLoggedIn }: LoginScreenProps) {
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   autoComplete="username"
-                  className="bg-zinc-800 border-zinc-700 text-white placeholder-zinc-500"
+                  className="bg-[var(--iptv-bg-elevated)] border-[var(--iptv-border)] text-white placeholder:text-[var(--iptv-text-dim)] focus-visible:border-[var(--iptv-gold)]"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password" className="text-zinc-200">
+                <Label htmlFor="password" className="text-[var(--iptv-text)]">
                   Password
                 </Label>
                 <div className="relative">
@@ -123,12 +136,12 @@ export function LoginScreen({ onLoggedIn }: LoginScreenProps) {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     autoComplete="current-password"
-                    className="bg-zinc-800 border-zinc-700 text-white placeholder-zinc-500 pr-10"
+                    className="bg-[var(--iptv-bg-elevated)] border-[var(--iptv-border)] text-white placeholder:text-[var(--iptv-text-dim)] focus-visible:border-[var(--iptv-gold)] pr-10"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPass((v) => !v)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-200"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--iptv-text-muted)] hover:text-white"
                     aria-label={showPass ? "Hide password" : "Show password"}
                   >
                     {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -146,7 +159,7 @@ export function LoginScreen({ onLoggedIn }: LoginScreenProps) {
               <Button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-gradient-to-r from-rose-500 to-orange-500 hover:from-rose-600 hover:to-orange-600 text-white"
+                className="w-full iptv-btn-gold border-0 h-11"
               >
                 {loading ? (
                   <>
@@ -159,20 +172,28 @@ export function LoginScreen({ onLoggedIn }: LoginScreenProps) {
               </Button>
             </form>
 
-            <div className="mt-6 flex items-start gap-2 p-3 rounded-md bg-zinc-800/50 border border-zinc-700/50 text-xs text-zinc-400">
-              <ShieldCheck className="w-4 h-4 flex-shrink-0 mt-0.5 text-emerald-400" />
+            <div className="mt-6 flex items-start gap-2 p-3 rounded-md bg-[var(--iptv-bg-elevated)] border border-[var(--iptv-border)] text-xs text-[var(--iptv-text-muted)]">
+              <ShieldCheck className="w-4 h-4 flex-shrink-0 mt-0.5 text-[var(--iptv-green)]" />
               <span>
                 Your credentials stay on this device. They are only sent to your
                 IPTV provider&apos;s server — never logged, never stored on any
                 other server.
               </span>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
-        <p className="text-center text-xs text-zinc-600 mt-6">
-          For personal use only. Respect your provider&apos;s terms of service.
-        </p>
+        <div className="flex items-center justify-between mt-6">
+          <button
+            onClick={() => router.push("/")}
+            className="text-xs text-[var(--iptv-text-dim)] hover:text-[var(--iptv-gold)] transition"
+          >
+            ← Back to home
+          </button>
+          <p className="text-xs text-[var(--iptv-text-dim)]">
+            For personal use only.
+          </p>
+        </div>
       </div>
     </div>
   );
