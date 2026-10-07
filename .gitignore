@@ -52,3 +52,10 @@ prompt
 server.log
 # Skills directory
 /skills/
+# User uploads (PDFs, screenshots, etc. — not part of the app)
+/upload/
+/tool-results/
+
+# Worker local config (contains account_id)
+worker/r2-image-cache/wrangler.toml
+worker/stream-proxy/wrangler.toml
