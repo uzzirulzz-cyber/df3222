@@ -15,6 +15,20 @@ const FAV_LIVE_KEY = "iptv:fav:live";
 const FAV_VOD_KEY = "iptv:fav:vod";
 const FAV_SERIES_KEY = "iptv:fav:series";
 const SETTINGS_KEY = "iptv:settings";
+const WATCH_HISTORY_KEY = "iptv:history";
+const MY_LIST_KEY = "iptv:mylist";
+
+export interface WatchHistoryEntry {
+  id: string;
+  kind: "live" | "vod" | "series";
+  title: string;
+  icon?: string;
+  /** epoch ms of last watch */
+  watchedAt: number;
+  /** for series episodes */
+  episodeId?: string;
+  episodeTitle?: string;
+}
 
 export interface IptvSettings {
   /** Live stream container format. Some providers don't serve .m3u8. */
@@ -117,5 +131,79 @@ export const favorites = {
       saveSet(FAV_SERIES_KEY, s);
       return s.has(id);
     },
+  },
+};
+
+/* ---------- Watch history ---------- */
+
+function loadHistory(): WatchHistoryEntry[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(WATCH_HISTORY_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw) as WatchHistoryEntry[];
+  } catch {
+    return [];
+  }
+}
+
+function saveHistory(list: WatchHistoryEntry[]) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(WATCH_HISTORY_KEY, JSON.stringify(list.slice(0, 50)));
+}
+
+export const history = {
+  list: () => loadHistory(),
+  add: (entry: Omit<WatchHistoryEntry, "watchedAt">) => {
+    const list = loadHistory().filter((e) => e.id !== entry.id || e.kind !== entry.kind);
+    list.unshift({ ...entry, watchedAt: Date.now() });
+    saveHistory(list);
+  },
+  clear: () => {
+    if (typeof window === "undefined") return;
+    localStorage.removeItem(WATCH_HISTORY_KEY);
+  },
+};
+
+/* ---------- My List (separate from favorites, like a watch-later queue) ---------- */
+
+function loadMyList(): WatchHistoryEntry[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(MY_LIST_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw) as WatchHistoryEntry[];
+  } catch {
+    return [];
+  }
+}
+
+function saveMyList(list: WatchHistoryEntry[]) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(MY_LIST_KEY, JSON.stringify(list.slice(0, 100)));
+}
+
+export const myList = {
+  list: () => loadMyList(),
+  has: (id: string, kind: string) =>
+    loadMyList().some((e) => e.id === id && e.kind === kind),
+  add: (entry: Omit<WatchHistoryEntry, "watchedAt">) => {
+    const list = loadMyList();
+    if (list.some((e) => e.id === entry.id && e.kind === entry.kind)) return false;
+    list.unshift({ ...entry, watchedAt: Date.now() });
+    saveMyList(list);
+    return true;
+  },
+  remove: (id: string, kind: string) => {
+    const list = loadMyList().filter((e) => e.id !== id || e.kind !== kind);
+    saveMyList(list);
+  },
+  toggle: (entry: Omit<WatchHistoryEntry, "watchedAt">) => {
+    if (myList.has(entry.id, entry.kind)) {
+      myList.remove(entry.id, entry.kind);
+      return false;
+    }
+    myList.add(entry);
+    return true;
   },
 };

@@ -120,3 +120,177 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* ============================================================
+   IPTV Cinematic Theme — gold + neon blue on near-black
+   ============================================================ */
+
+:root {
+  /* Core palette */
+  --iptv-bg: #07070d;
+  --iptv-bg-elevated: #0f0f1a;
+  --iptv-surface: #161624;
+  --iptv-surface-hover: #1f1f30;
+  --iptv-border: #262638;
+  --iptv-border-strong: #3a3a52;
+
+  /* Accents */
+  --iptv-gold: #f5b800;
+  --iptv-gold-bright: #ffd24a;
+  --iptv-gold-dim: #b88600;
+  --iptv-neon: #00d9ff;
+  --iptv-neon-dim: #0099b8;
+  --iptv-red: #ff3b4a;
+  --iptv-green: #2ecc71;
+
+  /* Text */
+  --iptv-text: #ffffff;
+  --iptv-text-muted: #9a9aae;
+  --iptv-text-dim: #5a5a72;
+
+  /* Effects */
+  --iptv-glow-gold: 0 0 24px rgba(245, 184, 0, 0.45);
+  --iptv-glow-neon: 0 0 24px rgba(0, 217, 255, 0.45);
+  --iptv-glow-red: 0 0 16px rgba(255, 59, 74, 0.6);
+  --iptv-shadow-card: 0 8px 32px rgba(0, 0, 0, 0.6);
+}
+
+.dark {
+  --background: oklch(0.07 0.005 270);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.12 0.008 270);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.12 0.008 270);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.78 0.15 75);
+  --primary-foreground: oklch(0.12 0.008 270);
+  --secondary: oklch(0.18 0.01 270);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.18 0.01 270);
+  --muted-foreground: oklch(0.65 0.01 270);
+  --accent: oklch(0.18 0.01 270);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.65 0.22 25);
+  --border: oklch(0.22 0.01 270);
+  --input: oklch(0.18 0.01 270);
+  --ring: oklch(0.78 0.15 75);
+}
+
+/* Hide scrollbars but keep functionality */
+.iptv-scroll-x {
+  scrollbar-width: thin;
+  scrollbar-color: var(--iptv-border-strong) transparent;
+}
+.iptv-scroll-x::-webkit-scrollbar {
+  height: 6px;
+}
+.iptv-scroll-x::-webkit-scrollbar-track {
+  background: transparent;
+}
+.iptv-scroll-x::-webkit-scrollbar-thumb {
+  background: var(--iptv-border-strong);
+  border-radius: 3px;
+}
+.iptv-scroll-x::-webkit-scrollbar-thumb:hover {
+  background: var(--iptv-gold-dim);
+}
+
+/* Cinematic card hover */
+.iptv-card {
+  position: relative;
+  background: var(--iptv-surface);
+  border: 1px solid var(--iptv-border);
+  border-radius: 0.5rem;
+  overflow: hidden;
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+  will-change: transform;
+}
+.iptv-card:hover {
+  transform: translateY(-4px) scale(1.04);
+  border-color: var(--iptv-gold);
+  box-shadow: var(--iptv-shadow-card), var(--iptv-glow-gold);
+  z-index: 10;
+}
+
+.iptv-card-live:hover {
+  border-color: var(--iptv-neon);
+  box-shadow: var(--iptv-shadow-card), var(--iptv-glow-neon);
+}
+
+/* Gold gradient text */
+.iptv-text-gold {
+  background: linear-gradient(135deg, var(--iptv-gold-bright) 0%, var(--iptv-gold) 50%, var(--iptv-gold-dim) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Glassmorphism panel */
+.iptv-glass {
+  background: rgba(15, 15, 26, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(58, 58, 82, 0.5);
+}
+
+/* Live pulse */
+@keyframes iptv-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.1); }
+}
+.iptv-pulse {
+  animation: iptv-pulse 1.5s ease-in-out infinite;
+}
+
+/* Hero gradient overlay */
+.iptv-hero-overlay {
+  background:
+    linear-gradient(90deg, rgba(7,7,13,0.95) 0%, rgba(7,7,13,0.7) 40%, rgba(7,7,13,0.2) 80%, transparent 100%),
+    linear-gradient(0deg, rgba(7,7,13,1) 0%, rgba(7,7,13,0.4) 30%, transparent 60%);
+}
+
+/* Button styles */
+.iptv-btn-gold {
+  background: linear-gradient(135deg, var(--iptv-gold-bright) 0%, var(--iptv-gold) 100%);
+  color: #0a0a14;
+  font-weight: 600;
+  box-shadow: var(--iptv-glow-gold);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.iptv-btn-gold:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 32px rgba(245, 184, 0, 0.7);
+}
+
+.iptv-btn-ghost {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: white;
+  transition: all 0.2s ease;
+}
+.iptv-btn-ghost:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+/* Badge */
+.iptv-badge-hd {
+  background: linear-gradient(135deg, var(--iptv-neon) 0%, var(--iptv-neon-dim) 100%);
+  color: #0a0a14;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+.iptv-badge-4k {
+  background: linear-gradient(135deg, var(--iptv-gold-bright) 0%, var(--iptv-gold-dim) 100%);
+  color: #0a0a14;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+.iptv-badge-live {
+  background: var(--iptv-red);
+  color: white;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  box-shadow: var(--iptv-glow-red);
+}

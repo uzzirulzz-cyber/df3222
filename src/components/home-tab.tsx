@@ -1,9 +1,34 @@
 "use client";
 
 import { useMemo } from "react";
-import { ChevronRight, Tv, Film, MonitorPlay, Heart, Flame, Star, Music, Sparkles, Calendar } from "lucide-react";
-import type { Category, LiveStream, VodStream, SeriesItem, XtreamCredentials } from "@/lib/xtream";
-import { favorites } from "@/lib/storage";
+import {
+  Flame,
+  TrendingUp,
+  Sparkles,
+  Star,
+  Music,
+  Film,
+  MonitorPlay,
+  Trophy,
+  Heart,
+  Tv,
+  Grid2x2,
+  History,
+  ListPlus,
+  Clock,
+} from "lucide-react";
+import type {
+  Category,
+  LiveStream,
+  VodStream,
+  SeriesItem,
+  XtreamCredentials,
+} from "@/lib/xtream";
+import { favorites, history as watchHistory, myList } from "@/lib/storage";
+import { ContentRow, RowItem } from "./content-row";
+import { ContentCard } from "./content-card";
+import { HeroBanner, type HeroSlide } from "./hero-banner";
+import { LiveSportsPanel } from "./live-sports-panel";
 
 interface HomeTabProps {
   creds: XtreamCredentials;
@@ -13,55 +38,64 @@ interface HomeTabProps {
   liveCategories: Category[];
   vodCategories: Category[];
   seriesCategories: Category[];
-  favTick: number; // bump to force re-render after fav toggle
+  favTick: number;
+  listTick: number;
   onPlayLive: (s: LiveStream) => void;
   onPlayVod: (s: VodStream) => void;
   onOpenSeries: (s: SeriesItem) => void;
-  onGoToTab: (tab: "live" | "vod" | "series") => void;
+  onShowEpg: (s: LiveStream) => void;
+  onToggleFavLive: (id: number) => void;
+  onToggleFavVod: (id: number) => void;
+  onToggleFavSeries: (id: number) => void;
+  onToggleList: (item: { id: string; kind: "live" | "vod" | "series"; title: string; icon?: string }) => void;
+  onGoToTab: (tab: "live" | "vod" | "series" | "sports" | "music" | "kids" | "genres") => void;
 }
 
-interface RowSection<T> {
-  id: string;
-  title: string;
-  icon: React.ReactNode;
-  accent: string; // tailwind text color
-  items: T[];
-  kind: "live" | "vod" | "series";
-}
-
-const ROW_SIZE = 20; // max items per row
+const ROW_SIZE = 18;
 
 /**
- * Detect "music"-like categories by name. Different providers use different
- * conventions — match common substrings case-insensitively.
+ * Find a category by keyword (case-insensitive substring match).
  */
-function findMusicCategory(categories: Category[]): Category | null {
+function findCategory(categories: Category[], keywords: string[]): Category | null {
   if (!categories?.length) return null;
-  const musicKeywords = ["music", "musique", "musik", "mtv", "radio", "fm"];
   for (const c of categories) {
     const name = c.category_name.toLowerCase();
-    if (musicKeywords.some((k) => name.includes(k))) return c;
+    if (keywords.some((k) => name.includes(k))) return c;
   }
   return null;
 }
 
-export function HomeTab({
-  creds,
-  liveStreams,
-  vodStreams,
-  seriesItems,
-  liveCategories,
-  vodCategories,
-  seriesCategories,
-  favTick,
-  onPlayLive,
-  onPlayVod,
-  onOpenSeries,
-  onGoToTab,
-}: HomeTabProps) {
-  // Build the sections. We use `favTick` indirectly via favorites.has() calls
-  // inside child renders by passing favTick as a dep of useMemo.
-  const sections = useMemo(() => {
+const SPORTS_KEYWORDS = ["sport", "espn", "football", "cricket", "basketball", "tennis", "nba", "nfl", "mlb", "nhl", "ufc", "wwe", "golf", "boxing", "f1", "motor"];
+const MUSIC_KEYWORDS = ["music", "musique", "musik", "mtv", "vh1", "concert"];
+const KIDS_KEYWORDS = ["kid", "child", "baby", "cartoon", "disney", "nick", "junior", "boomerang"];
+const NEWS_KEYWORDS = ["news", "cnn", "bbc", "sky news", "fox news", "al jazeera"];
+
+export function HomeTab(props: HomeTabProps) {
+  const {
+    creds,
+    liveStreams,
+    vodStreams,
+    seriesItems,
+    liveCategories,
+    vodCategories,
+    seriesCategories,
+    favTick,
+    listTick,
+    onPlayLive,
+    onPlayVod,
+    onOpenSeries,
+    onShowEpg,
+    onToggleFavLive,
+    onToggleFavVod,
+    onToggleFavSeries,
+    onToggleList,
+    onGoToTab,
+  } = props;
+
+  const data = useMemo(() => {
+    void favTick;
+    void listTick;
+
     const favsLive = favorites.live.list();
     const favsVod = favorites.vod.list();
     const favsSeries = favorites.series.list();
@@ -70,141 +104,121 @@ export function HomeTab({
     const favoriteVod = vodStreams.filter((s) => favsVod.has(String(s.stream_id)));
     const favoriteSeries = seriesItems.filter((s) => favsSeries.has(String(s.series_id)));
 
-    const recentVod = [...vodStreams]
-      .sort((a, b) => (Number(b.added) || 0) - (Number(a.added) || 0))
-      .slice(0, ROW_SIZE);
+    // "Continue Watching" — from watch history
+    const historyList = watchHistory.list();
 
-    const topRatedVod = [...vodStreams]
-      .filter((s) => s.rating_5based && s.rating_5based >= 3)
+    // "My List" — separate watch-later queue
+    const myListItems = myList.list();
+
+    // Popular Now — channels with archive support, fallback to first N
+    const popularLive =
+      liveStreams.filter((s) => s.tv_archive === 1).slice(0, ROW_SIZE).length > 0
+        ? liveStreams.filter((s) => s.tv_archive === 1).slice(0, ROW_SIZE)
+        : liveStreams.slice(0, ROW_SIZE);
+
+    // Trending — top-rated movies
+    const trending = [...vodStreams]
+      .filter((s) => s.rating_5based && s.rating_5based >= 3.5)
       .sort((a, b) => (b.rating_5based || 0) - (a.rating_5based || 0))
       .slice(0, ROW_SIZE);
 
-    const recentSeries = [...seriesItems]
+    // New Releases — recently added VOD
+    const newReleases = [...vodStreams]
+      .sort((a, b) => (Number(b.added) || 0) - (Number(a.added) || 0))
+      .slice(0, ROW_SIZE);
+
+    // All-Time Hits — top-rated movies overall
+    const allTimeHits = [...vodStreams]
+      .filter((s) => s.rating_5based && s.rating_5based >= 4)
+      .sort((a, b) => (b.rating_5based || 0) - (a.rating_5based || 0))
+      .slice(0, ROW_SIZE);
+
+    // Music — auto-detected
+    const musicLiveCat = findCategory(liveCategories, MUSIC_KEYWORDS);
+    const musicVodCat = !musicLiveCat ? findCategory(vodCategories, MUSIC_KEYWORDS) : null;
+    let musicLive: LiveStream[] = [];
+    let musicVod: VodStream[] = [];
+    if (musicLiveCat) {
+      musicLive = liveStreams
+        .filter((s) => String(s.category_id) === musicLiveCat.category_id)
+        .slice(0, ROW_SIZE);
+    }
+    if (musicVodCat) {
+      musicVod = vodStreams
+        .filter((s) => String(s.category_id) === musicVodCat.category_id)
+        .slice(0, ROW_SIZE);
+    }
+
+    // Sports — for the live panel + sports row
+    const sportsCat = findCategory(liveCategories, SPORTS_KEYWORDS);
+    const sportsLive = sportsCat
+      ? liveStreams.filter((s) => String(s.category_id) === sportsCat.category_id)
+      : [];
+
+    // Kids — for kids row
+    const kidsCat = findCategory(liveCategories, KIDS_KEYWORDS);
+    const kidsLive = kidsCat
+      ? liveStreams.filter((s) => String(s.category_id) === kidsCat.category_id).slice(0, ROW_SIZE)
+      : [];
+
+    // Drama — VOD in "drama" category or with "drama" in name
+    const dramaCat = findCategory(vodCategories, ["drama"]);
+    const dramaVod = dramaCat
+      ? vodStreams.filter((s) => String(s.category_id) === dramaCat.category_id).slice(0, ROW_SIZE)
+      : [];
+
+    // TV Series — recently added series
+    const tvSeries = [...seriesItems]
       .sort((a, b) => (Number(b.last_modified) || 0) - (Number(a.last_modified) || 0))
       .slice(0, ROW_SIZE);
 
-    // "Popular live" = channels with archive support, or just the first N
-    const popularLive = liveStreams
-      .filter((s) => s.tv_archive === 1)
-      .slice(0, ROW_SIZE);
-    const popularLiveFinal = popularLive.length > 0 ? popularLive : liveStreams.slice(0, ROW_SIZE);
-
-    // Music: find a music category in live, fall back to vod, then series
-    const musicLiveCat = findMusicCategory(liveCategories);
-    const musicVodCat = !musicLiveCat ? findMusicCategory(vodCategories) : null;
-    let musicItems: LiveStream[] | VodStream[] = [];
-    let musicKind: "live" | "vod" = "live";
-    if (musicLiveCat) {
-      musicItems = liveStreams.filter((s) => String(s.category_id) === musicLiveCat.category_id).slice(0, ROW_SIZE);
-      musicKind = "live";
-    } else if (musicVodCat) {
-      musicItems = vodStreams.filter((s) => String(s.category_id) === musicVodCat.category_id).slice(0, ROW_SIZE);
-      musicKind = "vod";
+    // Hero slides — pick top 5 from trending + popular live
+    const heroSlides: HeroSlide[] = [];
+    for (const v of trending.slice(0, 3)) {
+      heroSlides.push({
+        id: `vod-${v.stream_id}`,
+        kind: "vod",
+        title: v.name,
+        description: "Top-rated movie streaming now. Watch in HD or 4K.",
+        genre: "Movie",
+        rating: v.rating_5based,
+        year: v.added ? new Date(Number(v.added) * 1000).getFullYear().toString() : undefined,
+        backdrop: v.stream_icon,
+      });
     }
-
-    const rows: RowSection<LiveStream | VodStream | SeriesItem>[] = [];
-
-    // 1. Favorites (combined) — only show if there are any
-    if (favoriteLive.length > 0) {
-      rows.push({
-        id: "fav-live",
-        title: "My Favorites — Live",
-        icon: <Heart className="w-4 h-4" />,
-        accent: "text-rose-500",
-        items: favoriteLive,
+    for (const s of popularLive.slice(0, 2)) {
+      heroSlides.push({
+        id: `live-${s.stream_id}`,
         kind: "live",
-      });
-    }
-    if (favoriteVod.length > 0) {
-      rows.push({
-        id: "fav-vod",
-        title: "My Favorites — Movies",
-        icon: <Heart className="w-4 h-4" />,
-        accent: "text-rose-500",
-        items: favoriteVod,
-        kind: "vod",
-      });
-    }
-    if (favoriteSeries.length > 0) {
-      rows.push({
-        id: "fav-series",
-        title: "My Favorites — Series",
-        icon: <Heart className="w-4 h-4" />,
-        accent: "text-rose-500",
-        items: favoriteSeries,
-        kind: "series",
+        title: s.name,
+        description: "Live channel with catch-up support.",
+        genre: "Live TV",
+        backdrop: s.stream_icon,
       });
     }
 
-    // 2. Trending — top rated movies
-    if (topRatedVod.length > 0) {
-      rows.push({
-        id: "trending",
-        title: "Trending Now",
-        icon: <Flame className="w-4 h-4" />,
-        accent: "text-orange-500",
-        items: topRatedVod,
-        kind: "vod",
-      });
-    }
-
-    // 3. Recently Added Movies
-    if (recentVod.length > 0) {
-      rows.push({
-        id: "recent-vod",
-        title: "Recently Added Movies",
-        icon: <Sparkles className="w-4 h-4" />,
-        accent: "text-amber-400",
-        items: recentVod,
-        kind: "vod",
-      });
-    }
-
-    // 4. Popular Live (with catchup / archive support)
-    if (popularLiveFinal.length > 0) {
-      rows.push({
-        id: "popular-live",
-        title: "Popular Live Channels",
-        icon: <Tv className="w-4 h-4" />,
-        accent: "text-emerald-400",
-        items: popularLiveFinal,
-        kind: "live",
-      });
-    }
-
-    // 5. Music
-    if (musicItems.length > 0) {
-      rows.push({
-        id: "music",
-        title: musicLiveCat?.category_name || musicVodCat?.category_name || "Music",
-        icon: <Music className="w-4 h-4" />,
-        accent: "text-violet-400",
-        items: musicItems,
-        kind: musicKind,
-      });
-    }
-
-    // 6. Recently Added Series
-    if (recentSeries.length > 0) {
-      rows.push({
-        id: "recent-series",
-        title: "Recently Added Series",
-        icon: <MonitorPlay className="w-4 h-4" />,
-        accent: "text-cyan-400",
-        items: recentSeries,
-        kind: "series",
-      });
-    }
-
-    return rows;
-  }, [
-    liveStreams,
-    vodStreams,
-    seriesItems,
-    liveCategories,
-    vodCategories,
-    favTick,
-  ]);
+    return {
+      favoriteLive,
+      favoriteVod,
+      favoriteSeries,
+      historyList,
+      myListItems,
+      popularLive,
+      trending,
+      newReleases,
+      allTimeHits,
+      musicLive,
+      musicVod,
+      sportsLive,
+      kidsLive,
+      dramaVod,
+      tvSeries,
+      heroSlides,
+      sportsCatName: sportsCat?.category_name,
+      musicCatName: musicLiveCat?.category_name || musicVodCat?.category_name,
+      kidsCatName: kidsCat?.category_name,
+    };
+  }, [liveStreams, vodStreams, seriesItems, liveCategories, vodCategories, favTick, listTick]);
 
   const isEmpty =
     liveStreams.length === 0 &&
@@ -213,276 +227,484 @@ export function HomeTab({
 
   if (isEmpty) {
     return (
-      <div className="flex flex-col items-center justify-center py-32 text-zinc-500">
-        <Sparkles className="w-12 h-12 mb-3 opacity-40" />
-        <p className="text-sm">Loading your content…</p>
-        <p className="text-xs text-zinc-600 mt-1">Pulling catalogs from your provider</p>
+      <div className="flex flex-col items-center justify-center py-32 text-center">
+        <div className="w-16 h-16 mb-4 rounded-full bg-gradient-to-br from-[var(--iptv-gold)] to-[var(--iptv-gold-dim)] flex items-center justify-center shadow-[0_0_30px_rgba(245,184,0,0.4)]">
+          <Sparkles className="w-7 h-7 text-[#0a0a14]" />
+        </div>
+        <p className="text-white text-lg font-semibold">Loading your content</p>
+        <p className="text-[var(--iptv-text-muted)] text-sm mt-1">
+          Pulling catalogs from your provider…
+        </p>
       </div>
     );
   }
 
-  if (sections.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-32 text-zinc-500">
-        <Sparkles className="w-12 h-12 mb-3 opacity-40" />
-        <p className="text-sm">No content available yet</p>
-        <p className="text-xs text-zinc-600 mt-1">Try the Live TV, Movies, or Series tabs above</p>
-      </div>
-    );
-  }
+  const handleWatchHero = (slide: HeroSlide) => {
+    if (slide.kind === "live") {
+      const s = liveStreams.find((x) => `live-${x.stream_id}` === slide.id);
+      if (s) onPlayLive(s);
+    } else if (slide.kind === "vod") {
+      const s = vodStreams.find((x) => `vod-${x.stream_id}` === slide.id);
+      if (s) onPlayVod(s);
+    }
+  };
+
+  const isHeroAdded = (slide: HeroSlide) =>
+    myList.has(slide.id, slide.kind);
 
   return (
     <div className="space-y-8 pb-8">
-      {sections.map((row) => (
-        <SectionRow
-          key={row.id}
-          title={row.title}
-          icon={row.icon}
-          accent={row.accent}
-          items={row.items}
-          kind={row.kind}
-          favTick={favTick}
-          onPlayLive={onPlayLive}
-          onPlayVod={onPlayVod}
-          onOpenSeries={onOpenSeries}
-        />
-      ))}
+      {/* HERO */}
+      <HeroBanner
+        slides={data.heroSlides}
+        onWatch={handleWatchHero}
+        onAddToList={(slide) =>
+          onToggleList({ id: slide.id, kind: slide.kind, title: slide.title, icon: slide.backdrop })
+        }
+        isAdded={isHeroAdded}
+      />
 
-      {/* Quick links */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-4">
-        <QuickLink
-          icon={<Tv className="w-5 h-5" />}
+      {/* LIVE SPORTS PANEL (only if we have sports content) */}
+      {data.sportsLive.length > 0 && (
+        <LiveSportsPanel
+          liveNow={data.sportsLive}
+          onPlay={onPlayLive}
+          onShowAll={() => onGoToTab("sports")}
+        />
+      )}
+
+      {/* CONTINUE WATCHING */}
+      {data.historyList.length > 0 && (
+        <ContentRow
+          title="Continue Watching"
+          icon={<History className="w-5 h-5" />}
+          accent="neon"
+        >
+          {data.historyList.slice(0, ROW_SIZE).map((h) => (
+            <RowItem key={`${h.kind}-${h.id}`}>
+              <div
+                className="iptv-card group cursor-pointer w-full"
+                onClick={() => {
+                  if (h.kind === "live") {
+                    const s = liveStreams.find((x) => String(x.stream_id) === h.id);
+                    if (s) onPlayLive(s);
+                  } else if (h.kind === "vod") {
+                    const s = vodStreams.find((x) => String(x.stream_id) === h.id);
+                    if (s) onPlayVod(s);
+                  } else {
+                    const s = seriesItems.find((x) => String(x.series_id) === h.id);
+                    if (s) onOpenSeries(s);
+                  }
+                }}
+              >
+                <div className="relative aspect-[2/3] bg-[var(--iptv-bg-elevated)] overflow-hidden">
+                  {h.icon ? (
+                    <img
+                      src={h.icon}
+                      alt={h.title}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = "none";
+                      }}
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Tv className="w-6 h-6 text-[var(--iptv-text-dim)]" />
+                    </div>
+                  )}
+                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-2 pt-6">
+                    <p className="text-white text-xs font-medium line-clamp-2">{h.title}</p>
+                  </div>
+                  <div className="absolute bottom-2 left-2 right-2">
+                    <div className="h-1 rounded-full bg-white/20 overflow-hidden">
+                      <div className="h-full bg-[var(--iptv-neon)] w-2/3" />
+                    </div>
+                    <p className="text-[9px] text-[var(--iptv-text-muted)] mt-1 flex items-center gap-0.5">
+                      <Clock className="w-2 h-2" />
+                      {new Date(h.watchedAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </RowItem>
+          ))}
+        </ContentRow>
+      )}
+
+      {/* MY LIST */}
+      {data.myListItems.length > 0 && (
+        <ContentRow
+          title="My List"
+          icon={<ListPlus className="w-5 h-5" />}
+          accent="gold"
+        >
+          {data.myListItems.slice(0, ROW_SIZE).map((h) => (
+            <RowItem key={`mylist-${h.kind}-${h.id}`}>
+              <div
+                className="iptv-card group cursor-pointer w-full"
+                onClick={() => {
+                  if (h.kind === "live") {
+                    const s = liveStreams.find((x) => String(x.stream_id) === h.id);
+                    if (s) onPlayLive(s);
+                  } else if (h.kind === "vod") {
+                    const s = vodStreams.find((x) => String(x.stream_id) === h.id);
+                    if (s) onPlayVod(s);
+                  } else {
+                    const s = seriesItems.find((x) => String(x.series_id) === h.id);
+                    if (s) onOpenSeries(s);
+                  }
+                }}
+              >
+                <div className="relative aspect-[2/3] bg-[var(--iptv-bg-elevated)] overflow-hidden">
+                  {h.icon ? (
+                    <img
+                      src={h.icon}
+                      alt={h.title}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = "none";
+                      }}
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Film className="w-6 h-6 text-[var(--iptv-text-dim)]" />
+                    </div>
+                  )}
+                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-2 pt-6">
+                    <p className="text-white text-xs font-medium line-clamp-2">{h.title}</p>
+                  </div>
+                </div>
+              </div>
+            </RowItem>
+          ))}
+        </ContentRow>
+      )}
+
+      {/* 1. POPULAR NOW (live) */}
+      <ContentRow
+        title="Popular Now"
+        icon={<Flame className="w-5 h-5" />}
+        accent="red"
+        isEmpty={data.popularLive.length === 0}
+      >
+        {data.popularLive.map((s) => (
+          <RowItem key={`pop-${s.stream_id}`}>
+            <ContentCard
+              kind="live"
+              stream={s}
+              onPlay={() => onPlayLive(s)}
+              onShowEpg={() => onShowEpg(s)}
+              isFav={favorites.live.has(String(s.stream_id))}
+              onToggleFav={() => onToggleFavLive(s.stream_id)}
+              onToggleList={() =>
+                onToggleList({ id: String(s.stream_id), kind: "live", title: s.name, icon: s.stream_icon })
+              }
+              isAdded={myList.has(String(s.stream_id), "live")}
+            />
+          </RowItem>
+        ))}
+      </ContentRow>
+
+      {/* 2. TRENDING */}
+      <ContentRow
+        title="Trending"
+        icon={<TrendingUp className="w-5 h-5" />}
+        accent="gold"
+        isEmpty={data.trending.length === 0}
+      >
+        {data.trending.map((s) => (
+          <RowItem key={`tr-${s.stream_id}`}>
+            <ContentCard
+              kind="vod"
+              stream={s}
+              onPlay={() => onPlayVod(s)}
+              isFav={favorites.vod.has(String(s.stream_id))}
+              onToggleFav={() => onToggleFavVod(s.stream_id)}
+              onToggleList={() =>
+                onToggleList({ id: String(s.stream_id), kind: "vod", title: s.name, icon: s.stream_icon })
+              }
+              isAdded={myList.has(String(s.stream_id), "vod")}
+            />
+          </RowItem>
+        ))}
+      </ContentRow>
+
+      {/* 3. NEW RELEASES */}
+      <ContentRow
+        title="New Releases"
+        icon={<Sparkles className="w-5 h-5" />}
+        accent="neon"
+        isEmpty={data.newReleases.length === 0}
+      >
+        {data.newReleases.map((s) => (
+          <RowItem key={`nr-${s.stream_id}`}>
+            <ContentCard
+              kind="vod"
+              stream={s}
+              onPlay={() => onPlayVod(s)}
+              isFav={favorites.vod.has(String(s.stream_id))}
+              onToggleFav={() => onToggleFavVod(s.stream_id)}
+              onToggleList={() =>
+                onToggleList({ id: String(s.stream_id), kind: "vod", title: s.name, icon: s.stream_icon })
+              }
+              isAdded={myList.has(String(s.stream_id), "vod")}
+            />
+          </RowItem>
+        ))}
+      </ContentRow>
+
+      {/* 4. ALL-TIME HITS */}
+      <ContentRow
+        title="All-Time Hits"
+        icon={<Star className="w-5 h-5" />}
+        accent="gold"
+        isEmpty={data.allTimeHits.length === 0}
+      >
+        {data.allTimeHits.map((s) => (
+          <RowItem key={`hit-${s.stream_id}`}>
+            <ContentCard
+              kind="vod"
+              stream={s}
+              onPlay={() => onPlayVod(s)}
+              isFav={favorites.vod.has(String(s.stream_id))}
+              onToggleFav={() => onToggleFavVod(s.stream_id)}
+              onToggleList={() =>
+                onToggleList({ id: String(s.stream_id), kind: "vod", title: s.name, icon: s.stream_icon })
+              }
+              isAdded={myList.has(String(s.stream_id), "vod")}
+            />
+          </RowItem>
+        ))}
+      </ContentRow>
+
+      {/* 5. MUSIC */}
+      {(data.musicLive.length > 0 || data.musicVod.length > 0) && (
+        <ContentRow
+          title={data.musicCatName || "Music"}
+          icon={<Music className="w-5 h-5" />}
+          accent="neon"
+        >
+          {data.musicLive.map((s) => (
+            <RowItem key={`mus-l-${s.stream_id}`}>
+              <ContentCard
+                kind="live"
+                stream={s}
+                onPlay={() => onPlayLive(s)}
+                onShowEpg={() => onShowEpg(s)}
+                isFav={favorites.live.has(String(s.stream_id))}
+                onToggleFav={() => onToggleFavLive(s.stream_id)}
+              />
+            </RowItem>
+          ))}
+          {data.musicVod.map((s) => (
+            <RowItem key={`mus-v-${s.stream_id}`}>
+              <ContentCard
+                kind="vod"
+                stream={s}
+                onPlay={() => onPlayVod(s)}
+                isFav={favorites.vod.has(String(s.stream_id))}
+                onToggleFav={() => onToggleFavVod(s.stream_id)}
+              />
+            </RowItem>
+          ))}
+        </ContentRow>
+      )}
+
+      {/* 6. MOVIES (browse all) */}
+      <ContentRow
+        title="Movies"
+        icon={<Film className="w-5 h-5" />}
+        accent="gold"
+        isEmpty={vodStreams.length === 0}
+      >
+        {vodStreams.slice(0, ROW_SIZE).map((s) => (
+          <RowItem key={`mov-${s.stream_id}`}>
+            <ContentCard
+              kind="vod"
+              stream={s}
+              onPlay={() => onPlayVod(s)}
+              isFav={favorites.vod.has(String(s.stream_id))}
+              onToggleFav={() => onToggleFavVod(s.stream_id)}
+              onToggleList={() =>
+                onToggleList({ id: String(s.stream_id), kind: "vod", title: s.name, icon: s.stream_icon })
+              }
+              isAdded={myList.has(String(s.stream_id), "vod")}
+            />
+          </RowItem>
+        ))}
+      </ContentRow>
+
+      {/* 7. TV SERIES */}
+      <ContentRow
+        title="TV Series"
+        icon={<MonitorPlay className="w-5 h-5" />}
+        accent="neon"
+        isEmpty={data.tvSeries.length === 0}
+      >
+        {data.tvSeries.map((s) => (
+          <RowItem key={`ser-${s.series_id}`}>
+            <ContentCard
+              kind="series"
+              item={s}
+              onClick={undefined as never}
+              onPlay={() => onOpenSeries(s)}
+              isFav={favorites.series.has(String(s.series_id))}
+              onToggleFav={() => onToggleFavSeries(s.series_id)}
+              onToggleList={() =>
+                onToggleList({ id: String(s.series_id), kind: "series", title: s.name, icon: s.cover })
+              }
+              isAdded={myList.has(String(s.series_id), "series")}
+            />
+          </RowItem>
+        ))}
+      </ContentRow>
+
+      {/* 8. SPORTS */}
+      {data.sportsLive.length > 0 && (
+        <ContentRow
+          title={data.sportsCatName || "Sports"}
+          icon={<Trophy className="w-5 h-5" />}
+          accent="red"
+        >
+          {data.sportsLive.slice(0, ROW_SIZE).map((s) => (
+            <RowItem key={`sprt-${s.stream_id}`}>
+              <ContentCard
+                kind="live"
+                stream={s}
+                onPlay={() => onPlayLive(s)}
+                onShowEpg={() => onShowEpg(s)}
+                isFav={favorites.live.has(String(s.stream_id))}
+                onToggleFav={() => onToggleFavLive(s.stream_id)}
+              />
+            </RowItem>
+          ))}
+        </ContentRow>
+      )}
+
+      {/* 9. DRAMA */}
+      {data.dramaVod.length > 0 && (
+        <ContentRow
+          title="Drama"
+          icon={<Heart className="w-5 h-5" />}
+          accent="red"
+        >
+          {data.dramaVod.map((s) => (
+            <RowItem key={`drm-${s.stream_id}`}>
+              <ContentCard
+                kind="vod"
+                stream={s}
+                onPlay={() => onPlayVod(s)}
+                isFav={favorites.vod.has(String(s.stream_id))}
+                onToggleFav={() => onToggleFavVod(s.stream_id)}
+              />
+            </RowItem>
+          ))}
+        </ContentRow>
+      )}
+
+      {/* KIDS (bonus) */}
+      {data.kidsLive.length > 0 && (
+        <ContentRow
+          title={data.kidsCatName || "Kids"}
+          icon={<Sparkles className="w-5 h-5" />}
+          accent="gold"
+        >
+          {data.kidsLive.map((s) => (
+            <RowItem key={`kid-${s.stream_id}`}>
+              <ContentCard
+                kind="live"
+                stream={s}
+                onPlay={() => onPlayLive(s)}
+                onShowEpg={() => onShowEpg(s)}
+                isFav={favorites.live.has(String(s.stream_id))}
+                onToggleFav={() => onToggleFavLive(s.stream_id)}
+              />
+            </RowItem>
+          ))}
+        </ContentRow>
+      )}
+
+      {/* 10. ALL GENRES — quick links grid */}
+      <section>
+        <h2 className="flex items-center gap-2 text-base sm:text-lg font-bold text-white mb-3">
+          <Grid2x2 className="w-5 h-5 text-[var(--iptv-gold)]" />
+          All Genres
+        </h2>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5">
+          {liveCategories.slice(0, 24).map((c) => (
+            <button
+              key={c.category_id}
+              onClick={() => onGoToTab("genres")}
+              className="px-3 py-2.5 rounded-md bg-[var(--iptv-surface)] border border-[var(--iptv-border)] text-xs text-[var(--iptv-text-muted)] hover:text-white hover:border-[var(--iptv-gold)] hover:bg-[var(--iptv-surface-hover)] transition truncate"
+              title={c.category_name}
+            >
+              {c.category_name}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      {/* Quick navigation cards */}
+      <section className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <QuickLinkCard
+          icon={<Tv className="w-6 h-6" />}
           label="Browse all Live TV"
           count={liveStreams.length}
+          accent="neon"
           onClick={() => onGoToTab("live")}
         />
-        <QuickLink
-          icon={<Film className="w-5 h-5" />}
+        <QuickLinkCard
+          icon={<Film className="w-6 h-6" />}
           label="Browse all Movies"
           count={vodStreams.length}
+          accent="gold"
           onClick={() => onGoToTab("vod")}
         />
-        <QuickLink
-          icon={<MonitorPlay className="w-5 h-5" />}
+        <QuickLinkCard
+          icon={<MonitorPlay className="w-6 h-6" />}
           label="Browse all Series"
           count={seriesItems.length}
+          accent="neon"
           onClick={() => onGoToTab("series")}
         />
-      </div>
+      </section>
     </div>
   );
 }
 
-/* ---------- Sub-components ---------- */
-
-function SectionRow({
-  title,
-  icon,
-  accent,
-  items,
-  kind,
-  favTick,
-  onPlayLive,
-  onPlayVod,
-  onOpenSeries,
-}: {
-  title: string;
-  icon: React.ReactNode;
-  accent: string;
-  items: Array<LiveStream | VodStream | SeriesItem>;
-  kind: "live" | "vod" | "series";
-  favTick: number;
-  onPlayLive: (s: LiveStream) => void;
-  onPlayVod: (s: VodStream) => void;
-  onOpenSeries: (s: SeriesItem) => void;
-}) {
-  // touch favTick so React re-renders when favorites change
-  void favTick;
-
-  return (
-    <section>
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="flex items-center gap-2 text-sm font-semibold text-white">
-          <span className={accent}>{icon}</span>
-          {title}
-        </h2>
-      </div>
-      <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 snap-x">
-        {items.map((item) => {
-          if (kind === "live") {
-            const s = item as LiveStream;
-            return (
-              <LiveRowCard
-                key={`live-${s.stream_id}`}
-                stream={s}
-                onPlay={() => onPlayLive(s)}
-              />
-            );
-          }
-          if (kind === "vod") {
-            const s = item as VodStream;
-            return (
-              <VodRowCard
-                key={`vod-${s.stream_id}`}
-                stream={s}
-                onPlay={() => onPlayVod(s)}
-              />
-            );
-          }
-          const s = item as SeriesItem;
-          return (
-            <SeriesRowCard
-              key={`series-${s.series_id}`}
-              item={s}
-              onClick={() => onOpenSeries(s)}
-            />
-          );
-        })}
-      </div>
-    </section>
-  );
-}
-
-function LiveRowCard({
-  stream,
-  onPlay,
-}: {
-  stream: LiveStream;
-  onPlay: () => void;
-}) {
-  return (
-    <button
-      onClick={onPlay}
-      className="group flex-shrink-0 w-40 sm:w-44 text-left bg-zinc-900 rounded-lg overflow-hidden hover:ring-2 hover:ring-rose-500 transition"
-    >
-      <div className="aspect-square bg-zinc-800 flex items-center justify-center p-3">
-        {stream.stream_icon ? (
-          <img
-            src={stream.stream_icon}
-            alt={stream.name}
-            className="max-w-full max-h-full object-contain"
-            loading="lazy"
-            onError={(e) => {
-              (e.target as HTMLImageElement).style.display = "none";
-            }}
-          />
-        ) : (
-          <Tv className="w-8 h-8 text-zinc-600" />
-        )}
-      </div>
-      <div className="p-2">
-        <p className="text-xs text-white line-clamp-2 leading-tight">{stream.name}</p>
-      </div>
-    </button>
-  );
-}
-
-function VodRowCard({
-  stream,
-  onPlay,
-}: {
-  stream: VodStream;
-  onPlay: () => void;
-}) {
-  return (
-    <button
-      onClick={onPlay}
-      className="group flex-shrink-0 w-28 sm:w-32 text-left bg-zinc-900 rounded-lg overflow-hidden hover:ring-2 hover:ring-rose-500 transition"
-    >
-      <div className="aspect-[2/3] bg-zinc-800 flex items-center justify-center">
-        {stream.stream_icon ? (
-          <img
-            src={stream.stream_icon}
-            alt={stream.name}
-            className="w-full h-full object-cover"
-            loading="lazy"
-            onError={(e) => {
-              (e.target as HTMLImageElement).style.display = "none";
-            }}
-          />
-        ) : (
-          <Film className="w-7 h-7 text-zinc-600" />
-        )}
-      </div>
-      <div className="p-2">
-        <p className="text-xs text-white line-clamp-2 leading-tight">{stream.name}</p>
-        {stream.rating_5based > 0 && (
-          <p className="text-[10px] text-amber-400 mt-0.5 flex items-center gap-0.5">
-            <Star className="w-2.5 h-2.5 fill-current" />
-            {stream.rating_5based.toFixed(1)}
-          </p>
-        )}
-      </div>
-    </button>
-  );
-}
-
-function SeriesRowCard({
-  item,
-  onClick,
-}: {
-  item: SeriesItem;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className="group flex-shrink-0 w-28 sm:w-32 text-left bg-zinc-900 rounded-lg overflow-hidden hover:ring-2 hover:ring-rose-500 transition"
-    >
-      <div className="aspect-[2/3] bg-zinc-800 flex items-center justify-center">
-        {item.cover ? (
-          <img
-            src={item.cover}
-            alt={item.name}
-            className="w-full h-full object-cover"
-            loading="lazy"
-            onError={(e) => {
-              (e.target as HTMLImageElement).style.display = "none";
-            }}
-          />
-        ) : (
-          <MonitorPlay className="w-7 h-7 text-zinc-600" />
-        )}
-      </div>
-      <div className="p-2">
-        <p className="text-xs text-white line-clamp-2 leading-tight">{item.name}</p>
-        {item.rating_5based > 0 && (
-          <p className="text-[10px] text-amber-400 mt-0.5 flex items-center gap-0.5">
-            <Star className="w-2.5 h-2.5 fill-current" />
-            {item.rating_5based.toFixed(1)}
-          </p>
-        )}
-      </div>
-    </button>
-  );
-}
-
-function QuickLink({
+function QuickLinkCard({
   icon,
   label,
   count,
+  accent,
   onClick,
 }: {
   icon: React.ReactNode;
   label: string;
   count: number;
+  accent: "gold" | "neon";
   onClick: () => void;
 }) {
   return (
     <button
       onClick={onClick}
-      className="flex items-center gap-3 p-4 rounded-lg bg-zinc-900 border border-zinc-800 hover:border-rose-500 hover:bg-zinc-800 transition text-left group"
+      className="group flex items-center gap-4 p-4 rounded-xl bg-[var(--iptv-surface)] border border-[var(--iptv-border)] hover:border-[var(--iptv-gold)] hover:bg-[var(--iptv-surface-hover)] transition text-left"
     >
-      <div className="w-10 h-10 rounded-md bg-zinc-800 group-hover:bg-rose-500/20 flex items-center justify-center text-zinc-300 group-hover:text-rose-400 transition">
+      <div
+        className={`w-12 h-12 rounded-lg flex items-center justify-center transition ${
+          accent === "gold"
+            ? "bg-[var(--iptv-gold)]/15 text-[var(--iptv-gold)] group-hover:bg-[var(--iptv-gold)]/25"
+            : "bg-[var(--iptv-neon)]/15 text-[var(--iptv-neon)] group-hover:bg-[var(--iptv-neon)]/25"
+        }`}
+      >
         {icon}
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-white truncate">{label}</p>
-        <p className="text-xs text-zinc-500 mt-0.5">
+        <p className="text-sm font-semibold text-white truncate">{label}</p>
+        <p className="text-xs text-[var(--iptv-text-muted)] mt-0.5">
           {count.toLocaleString()} items
         </p>
       </div>
-      <ChevronRight className="w-4 h-4 text-zinc-600 group-hover:text-white transition" />
     </button>
   );
 }
