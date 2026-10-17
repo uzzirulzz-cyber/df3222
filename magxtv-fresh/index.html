@@ -247,7 +247,7 @@ h2.h{font-weight:800;font-size:clamp(28px,3.6vw,44px);line-height:1.1}
 <section class="sec" id="watch"><div class="container-fluid hx">
  <div class="d-flex flex-wrap align-items-end justify-content-between gap-3 mb-3">
   <div><h2>Watch</h2><p class="mb-0" id="wsub">Loading…</p></div>
-  <div class="wtabs" role="tablist"><button type="button" class="on" data-tab="live">Live TV</button><button type="button" data-tab="movies">Movies</button></div>
+  <div class="wtabs" role="tablist"><button type="button" class="on" data-tab="live">Live TV</button></div>
  </div>
  <div class="row g-3">
   <div class="col-xl-8">
@@ -390,13 +390,13 @@ function demo(){
  S.cats.movies=[{id:"a",n:"Action"},{id:"d",n:"Drama"},{id:"c",n:"Comedy"}];
  S.items.movies=[["a","Last Stand 4K"],["a","Night Pursuit"],["d","The Long Road"],["d","Paper Cities"],["c","Weekend Plans"],["c","Double Trouble"]].map(function(x,i){return{id:500+i,n:x[1],i:"",c:x[0],x:"mp4",r:"7."+i}});
 }
-function getJSON(p){return fetch(API+p).then(function(r){if(!r.ok)throw new Error(r.status);return r.json()})}
+function getJSON(p){return fetch(API+p,{cache:"no-store"}).then(function(r){if(!r.ok)throw new Error(r.status);return r.json()})}
 function ensureToken(){if(token&&Date.now()-tokenAt<5*3600e3)return Promise.resolve();return getJSON("/api/token").then(function(r){token=r.t;tokenAt=Date.now()})}
 function load(tab){
- if(!hasApi){if(!S.items.live.length)demo();return Promise.resolve()}
+ if(!hasApi){throw new Error("Streaming API is not configured")}
  if(S.items[tab].length)return Promise.resolve();
  var k=tab==="live"?"live":"vod";
- return Promise.all([getJSON("/api/"+k+"/categories"),getJSON("/api/"+k+"/streams")]).then(function(r){S.cats[tab]=r[0];S.items[tab]=r[1]});
+ return Promise.all([getJSON("/api/"+k+"/categories"),getJSON("/api/"+k+"/streams")]).then(function(r){S.cats[tab]=r[0];S.items[tab]=tab==="live"?(Array.isArray(r[1])?r[1]:[]).filter(function(x){var cat=(r[0]||[]).filter(function(c){return String(c.id)===String(x.c)})[0],label=(x.n||"")+" "+(cat?cat.n:"");return /sport|football|cricket|tennis|basketball|rugby|hockey|golf|boxing|ufc|racing|formula|f1|nba|nfl|nhl|espn|bein|supersport|eurosport|willow|dazn|premier league|champions league|ipl|t20/i.test(label)&&!/movie|cinema|series|vod|adult|xxx/i.test(label)}):[];if(tab==="live"){var ids=new Set(S.items.live.map(function(x){return String(x.c)}));S.cats.live=(r[0]||[]).filter(function(x){return ids.has(String(x.id))})}});
 }
 function catName(id){var c=S.cats[S.tab].filter(function(x){return x.id===id})[0];return c?c.n:""}
 function filt(){var q=S.q.trim().toLowerCase(),a=S.items[S.tab];
@@ -439,7 +439,7 @@ function play(x){
 function find(id){return S.items[S.tab].filter(function(x){return String(x.id)===String(id)})[0]}
 function step(d){if(!S.view.length)return;var i=-1;S.view.forEach(function(x,k){if(S.cur&&String(x.id)===String(S.cur.id)&&S.cur.tab===S.tab)i=k});play(S.view[(i+d+S.view.length)%S.view.length])}
 function sub(){$("wsub").textContent=hasApi?(S.items[S.tab].length.toLocaleString()+(S.tab==="live"?" live channels":" movies")):"Preview mode — connect your stream API to play real channels"}
-function switchTab(t){S.tab=t;S.cat="all";S.shown=60;S.q="";$("q").value="";$("q").placeholder=t==="live"?"Search channels...":"Search movies...";
+function switchTab(t){t="live";S.tab=t;S.cat="all";S.shown=60;S.q="";$("q").value="";$("q").placeholder=t==="live"?"Search channels...":"Search movies...";
  document.querySelectorAll(".wtabs button").forEach(function(b){b.classList.toggle("on",b.dataset.tab===t)});
  load(t).then(function(){sub();renderCats();renderItems()}).catch(function(){$("wsub").textContent="Can't reach the stream server"})}
 document.querySelector(".wtabs").addEventListener("click",function(e){var b=e.target.closest("button");if(b)switchTab(b.dataset.tab)});
