@@ -417,21 +417,24 @@ function epg(id){var el=$("epg");el.textContent="";getJSON("/api/epg/"+id).then(
  if(!r.length){el.textContent="No programme info";return}
  var n=r[0],now=Date.now()/1e3,pc=Math.max(0,Math.min(100,(now-n.s)/(n.e-n.s)*100));
  el.innerHTML='<div class="text-white">'+esc(n.t)+'</div><div class="bar"><i style="width:'+pc+'%"></i></div>'+(r[1]?"<div>Next: "+esc(r[1].t)+" · "+hm(r[1].s)+"</div>":"")}).catch(function(){})}
+var tsPlayer=null;
+function stopPlayers(){if(hls){hls.destroy();hls=null}if(tsPlayer){tsPlayer.destroy();tsPlayer=null}vid.pause();vid.removeAttribute("src");vid.load()}
+function tsFallback(x){stopPlayers();over(x.n,"Trying MPEG-TS fallback…",false);if(!window.mpegts||!mpegts.isSupported()){fail("Neither HLS nor MPEG-TS is supported in this browser");return}ensureToken().then(function(){tsPlayer=mpegts.createPlayer({type:"mpegts",isLive:true,url:API+"/ts/"+x.id+".ts?t="+encodeURIComponent(token)},{enableWorker:false,liveBufferLatencyChasing:true,liveBufferLatencyMaxLatency:8,liveBufferLatencyMinRemain:1});tsPlayer.attachMediaElement(vid);tsPlayer.on(mpegts.Events.ERROR,function(type,detail){fail("MPEG-TS stream unavailable: "+(detail||type))});tsPlayer.load();tsPlayer.play().catch(function(){over(x.n,"Press play to start this stream",false)})}).catch(function(e){fail("Stream authentication failed: "+e.message)})}
 function play(x){
  S.cur={id:x.id,tab:S.tab,x:x};ls("mx.last",{t:S.tab,id:x.id});fails=0;
  $("npName").textContent=x.n;setFav();renderItems();
- if(!hasApi){over(x.n,"Preview mode — connect your stream API to play",false);$("epg").textContent="";return}
+ if(!hasApi){over(x.n,"Streaming API not configured",false);$("epg").textContent="";return}
  over(x.n,"Loading…",false);
  ensureToken().then(function(){
   var src=S.tab==="live"?API+"/hls/"+x.id+".m3u8?t="+token:API+"/vod/"+x.id+"."+(x.x||"mp4")+"?t="+token;
-  if(hls){hls.destroy();hls=null}
+  stopPlayers();
   if(S.tab==="live"&&window.Hls&&Hls.isSupported()){
    hls=new Hls({lowLatencyMode:true,maxBufferLength:20});hls.loadSource(src);hls.attachMedia(vid);
    hls.on(Hls.Events.MANIFEST_PARSED,function(){vid.play().catch(function(){})});
    hls.on(Hls.Events.ERROR,function(e,d){if(!d.fatal)return;
     if(d.type===Hls.ErrorTypes.NETWORK_ERROR&&++fails<5)hls.startLoad();
     else if(d.type===Hls.ErrorTypes.MEDIA_ERROR&&fails++<3)hls.recoverMediaError();
-    else fail("This channel is unavailable right now")});
+    else tsFallback(x)});
   }else{vid.src=src;vid.play().catch(function(){})}
   if(S.tab==="live")epg(x.id);else $("epg").textContent=x.r?"Rating "+x.r:"";
  }).catch(function(){fail("Can't reach the stream server")});
@@ -523,5 +526,6 @@ if(!reduce&&window.MutationObserver){new MutationObserver(function(){var now=pri
  if(a!=null&&a!==c){var t0=performance.now();(function f(t){var k=Math.min(1,(t-t0)/600),e=1-Math.pow(1-k,3);el.textContent="$"+(a+(c-a)*e).toFixed(2);if(k<1)requestAnimationFrame(f)})(t0)}});prev=now}).observe(pg,{childList:true})}
 })();
 </script>
+<script src="https://cdn.jsdelivr.net/npm/mpegts.js@1.8.0/dist/mpegts.js"></script>
 </body>
 </html>
