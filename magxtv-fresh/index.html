@@ -390,13 +390,25 @@ function demo(){
  S.cats.movies=[{id:"a",n:"Action"},{id:"d",n:"Drama"},{id:"c",n:"Comedy"}];
  S.items.movies=[["a","Last Stand 4K"],["a","Night Pursuit"],["d","The Long Road"],["d","Paper Cities"],["c","Weekend Plans"],["c","Double Trouble"]].map(function(x,i){return{id:500+i,n:x[1],i:"",c:x[0],x:"mp4",r:"7."+i}});
 }
-function getJSON(p){return fetch(API+p,{cache:"no-store"}).then(function(r){if(!r.ok)throw new Error(r.status);return r.json()})}
-function ensureToken(){if(token&&Date.now()-tokenAt<5*3600e3)return Promise.resolve();return getJSON("/api/token").then(function(r){token=r.t;tokenAt=Date.now()})}
+var PLAYBEAT_CATALOG_SOURCES=["https://stream.playbeattv.buzz/data/stream-catalog.json","https://raw.githubusercontent.com/uzzirulzz-cyber/playbeat-tv/main/public/data/stream-catalog.json"];
+var playbeatCatalog=null;
+function ensureToken(){return Promise.resolve()}
 function load(tab){
- if(!hasApi){throw new Error("Streaming API is not configured")}
- if(S.items[tab].length)return Promise.resolve();
- var k=tab==="live"?"live":"vod";
- return Promise.all([getJSON("/api/"+k+"/categories"),getJSON("/api/"+k+"/streams")]).then(function(r){S.cats[tab]=r[0];S.items[tab]=tab==="live"?(Array.isArray(r[1])?r[1]:[]).filter(function(x){var cat=(r[0]||[]).filter(function(c){return String(c.id)===String(x.c)})[0],label=(x.n||"")+" "+(cat?cat.n:"");return /sport|football|cricket|tennis|basketball|rugby|hockey|golf|boxing|ufc|racing|formula|f1|nba|nfl|nhl|espn|bein|supersport|eurosport|willow|dazn|premier league|champions league|ipl|t20/i.test(label)&&!/movie|cinema|series|vod|adult|xxx/i.test(label)}):[];if(tab==="live"){var ids=new Set(S.items.live.map(function(x){return String(x.c)}));S.cats.live=(r[0]||[]).filter(function(x){return ids.has(String(x.id))})}});
+ if(tab!=="live")return Promise.resolve();
+ if(!playbeatCatalog){playbeatCatalog=(async function(){
+   var errors=[];
+   for(var source of PLAYBEAT_CATALOG_SOURCES){
+     try{var response=await fetch(source,{cache:"no-store"});if(!response.ok)throw Error("HTTP "+response.status);
+     var data=await response.json();if(!Array.isArray(data.channels))throw Error("Invalid catalog");
+     return data}catch(err){errors.push(String(err.message||err))}
+   }
+   throw Error("PlayBeat TV catalog unavailable: "+errors.join(" / "));
+ })().catch(function(err){playbeatCatalog=null;throw err})}
+ return playbeatCatalog.then(function(data){
+   var valid=data.channels.filter(function(ch){return Array.isArray(ch.cats)&&ch.cats.indexOf("sports")!==-1&&Array.isArray(ch.srcs)&&ch.srcs.some(function(src){return src.u&&src.u.startsWith("https://")&&src.u.includes(".m3u8")})});
+   S.items.live=valid.map(function(ch){return{id:ch.id,n:ch.name,i:ch.logo||"",c:"sports",e:"",srcs:ch.srcs}});
+   S.cats.live=[{id:"sports",n:"Sports"}];
+ });
 }
 function catName(id){var c=S.cats[S.tab].filter(function(x){return x.id===id})[0];return c?c.n:""}
 function filt(){var q=S.q.trim().toLowerCase(),a=S.items[S.tab];
@@ -421,23 +433,23 @@ var tsPlayer=null;
 function stopPlayers(){if(hls){hls.destroy();hls=null}if(tsPlayer){tsPlayer.destroy();tsPlayer=null}vid.pause();vid.removeAttribute("src");vid.load()}
 function tsFallback(x){stopPlayers();over(x.n,"Trying MPEG-TS fallback…",false);if(!window.mpegts||!mpegts.isSupported()){fail("Neither HLS nor MPEG-TS is supported in this browser");return}ensureToken().then(function(){tsPlayer=mpegts.createPlayer({type:"mpegts",isLive:true,url:API+"/ts/"+x.id+".ts?t="+encodeURIComponent(token)},{enableWorker:false,liveBufferLatencyChasing:true,liveBufferLatencyMaxLatency:8,liveBufferLatencyMinRemain:1});tsPlayer.attachMediaElement(vid);tsPlayer.on(mpegts.Events.ERROR,function(type,detail){fail("MPEG-TS stream unavailable: "+(detail||type))});tsPlayer.load();tsPlayer.play().catch(function(){over(x.n,"Press play to start this stream",false)})}).catch(function(e){fail("Stream authentication failed: "+e.message)})}
 function play(x){
- S.cur={id:x.id,tab:S.tab,x:x};ls("mx.last",{t:S.tab,id:x.id});fails=0;
- $("npName").textContent=x.n;setFav();renderItems();
- if(!hasApi){over(x.n,"Streaming API not configured",false);$("epg").textContent="";return}
- over(x.n,"Loading…",false);
- ensureToken().then(function(){
-  var src=S.tab==="live"?API+"/hls/"+x.id+".m3u8?t="+token:API+"/vod/"+x.id+"."+(x.x||"mp4")+"?t="+token;
-  stopPlayers();
-  if(S.tab==="live"&&window.Hls&&Hls.isSupported()){
-   hls=new Hls({lowLatencyMode:true,maxBufferLength:20});hls.loadSource(src);hls.attachMedia(vid);
-   hls.on(Hls.Events.MANIFEST_PARSED,function(){vid.play().catch(function(){})});
-   hls.on(Hls.Events.ERROR,function(e,d){if(!d.fatal)return;
-    if(d.type===Hls.ErrorTypes.NETWORK_ERROR&&++fails<5)hls.startLoad();
-    else if(d.type===Hls.ErrorTypes.MEDIA_ERROR&&fails++<3)hls.recoverMediaError();
-    else tsFallback(x)});
-  }else{vid.src=src;vid.play().catch(function(){})}
-  if(S.tab==="live")epg(x.id);else $("epg").textContent=x.r?"Rating "+x.r:"";
- }).catch(function(){fail("Can't reach the stream server")});
+ S.cur={id:x.id,tab:"live",x:x};ls("mx.last",{t:"live",id:x.id});fails=0;
+ $("npName").textContent=x.n;setFav();renderItems();stopPlayers();
+ over(x.n,"Connecting to PlayBeat TV sports source…",false);
+ var sources=(x.srcs||[]).filter(function(item){return item.u&&item.u.startsWith("https://")});
+ var index=0;
+ function tryNext(reason){
+   if(index>=sources.length){fail("Stream unavailable. "+(reason||"The broadcaster may be offline or geo-restricted."));return}
+   var source=sources[index++].u;stopPlayers();
+   if(vid.canPlayType("application/vnd.apple.mpegurl")){vid.src=source;vid.play().catch(function(){over(x.n,"Press Play to watch",false)});return}
+   if(!window.Hls||!Hls.isSupported()){fail("HLS is unsupported on this device");return}
+   hls=new Hls({lowLatencyMode:false,maxBufferLength:20});
+   hls.loadSource(source);hls.attachMedia(vid);
+   hls.on(Hls.Events.MANIFEST_PARSED,function(){vid.play().catch(function(){over(x.n,"Press Play to watch",false)})});
+   hls.on(Hls.Events.ERROR,function(event,detail){if(detail.fatal)tryNext("Source failed: "+detail.details)});
+ }
+ tryNext();
+ $("epg").textContent="Sports channel · Playback depends on the broadcaster";
 }
 function find(id){return S.items[S.tab].filter(function(x){return String(x.id)===String(id)})[0]}
 function step(d){if(!S.view.length)return;var i=-1;S.view.forEach(function(x,k){if(S.cur&&String(x.id)===String(S.cur.id)&&S.cur.tab===S.tab)i=k});play(S.view[(i+d+S.view.length)%S.view.length])}
