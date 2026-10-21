@@ -398,7 +398,7 @@ function load(tab){
  if(!playbeatCatalog){playbeatCatalog=(async function(){
    var errors=[];
    for(var source of PLAYBEAT_CATALOG_SOURCES){
-     try{var response=await fetch(source,{cache:"no-store"});if(!response.ok)throw Error("HTTP "+response.status);
+     try{var controller=new AbortController(),timeout=setTimeout(function(){controller.abort()},12000);var response;try{response=await fetch(source,{cache:"no-store",signal:controller.signal})}finally{clearTimeout(timeout)};if(!response.ok)throw Error("HTTP "+response.status);
      var data=await response.json();if(!Array.isArray(data.channels))throw Error("Invalid catalog");
      return data}catch(err){errors.push(String(err.message||err))}
    }
@@ -432,31 +432,64 @@ function epg(id){var el=$("epg");el.textContent="";getJSON("/api/epg/"+id).then(
 var tsPlayer=null;
 function stopPlayers(){if(hls){hls.destroy();hls=null}if(tsPlayer){tsPlayer.destroy();tsPlayer=null}vid.pause();vid.removeAttribute("src");vid.load()}
 function tsFallback(x){stopPlayers();over(x.n,"Trying MPEG-TS fallback…",false);if(!window.mpegts||!mpegts.isSupported()){fail("Neither HLS nor MPEG-TS is supported in this browser");return}ensureToken().then(function(){tsPlayer=mpegts.createPlayer({type:"mpegts",isLive:true,url:API+"/ts/"+x.id+".ts?t="+encodeURIComponent(token)},{enableWorker:false,liveBufferLatencyChasing:true,liveBufferLatencyMaxLatency:8,liveBufferLatencyMinRemain:1});tsPlayer.attachMediaElement(vid);tsPlayer.on(mpegts.Events.ERROR,function(type,detail){fail("MPEG-TS stream unavailable: "+(detail||type))});tsPlayer.load();tsPlayer.play().catch(function(){over(x.n,"Press play to start this stream",false)})}).catch(function(e){fail("Stream authentication failed: "+e.message)})}
+var playbackGeneration=0,startupTimer=null,advanceSource=null;
 function play(x){
+ var generation=++playbackGeneration;
+ if(startupTimer)clearTimeout(startupTimer);
  S.cur={id:x.id,tab:"live",x:x};ls("mx.last",{t:"live",id:x.id});fails=0;
  $("npName").textContent=x.n;setFav();renderItems();stopPlayers();
- over(x.n,"Connecting to PlayBeat TV sports source…",false);
- var sources=(x.srcs||[]).filter(function(item){return item.u&&item.u.startsWith("https://")});
- var index=0;
+ var sources=(x.srcs||[]).filter(function(item){return item.u&&item.u.startsWith("https://")&&/\.m3u8(?:$|[?#])/i.test(item.u)});
+ var index=0,attempt=0;
  function tryNext(reason){
-   if(index>=sources.length){fail("Stream unavailable. "+(reason||"The broadcaster may be offline or geo-restricted."));return}
-   var source=sources[index++].u;stopPlayers();
-   if(vid.canPlayType("application/vnd.apple.mpegurl")){vid.src=source;vid.play().catch(function(){over(x.n,"Press Play to watch",false)});return}
-   if(!window.Hls||!Hls.isSupported()){fail("HLS is unsupported on this device");return}
-   hls=new Hls({lowLatencyMode:false,maxBufferLength:20});
-   hls.loadSource(source);hls.attachMedia(vid);
-   hls.on(Hls.Events.MANIFEST_PARSED,function(){vid.play().catch(function(){over(x.n,"Press Play to watch",false)})});
-   hls.on(Hls.Events.ERROR,function(event,detail){if(detail.fatal)tryNext("Source failed: "+detail.details)});
+   if(generation!==playbackGeneration)return;
+   if(startupTimer)clearTimeout(startupTimer);
+   var activeAttempt=++attempt;
+   advanceSource=null;vid.onerror=null;stopPlayers();
+   if(index>=sources.length){fail(reason||"No compatible HTTPS HLS source is available for this channel.");return}
+   var source=sources[index++].u;
+   over(x.n,"Connecting — source "+index+" of "+sources.length,false);
+   function active(){return generation===playbackGeneration&&attempt===activeAttempt}
+   function next(message){if(active())tryNext(message)}
+   advanceSource=function(message){next(message)};
+   function begin(){
+     if(!active())return;
+     vid.play().catch(function(error){
+       if(!active()||error.name==="AbortError")return;
+       if(error.name==="NotAllowedError"){
+         if(startupTimer)clearTimeout(startupTimer);
+         $("pover").classList.add("hide");
+         $("epg").textContent="Tap the video Play control to start "+x.n;
+       }else next("Playback could not start ("+(error.name||"media error")+"). The source may be offline or unsupported.");
+     });
+   }
+   startupTimer=setTimeout(function(){next("The broadcaster did not deliver playable video within 15 seconds. Try another channel or retry later.")},15000);
+   vid.onerror=function(){next("The broadcaster's stream is unavailable or incompatible with this browser.")};
+   // Prefer hls.js on MSE browsers: Chromium can report native HLS support without decoding it reliably.
+   if(window.Hls&&Hls.isSupported()){
+     var player=hls=new Hls({lowLatencyMode:false,maxBufferLength:20,manifestLoadingTimeOut:10000,manifestLoadingMaxRetry:1,levelLoadingTimeOut:10000,fragLoadingTimeOut:10000});
+     player.on(Hls.Events.MANIFEST_PARSED,begin);
+     player.on(Hls.Events.ERROR,function(event,detail){
+       if(!active()||!detail.fatal)return;
+       next("Source failed ("+detail.details+"). It may be offline, region restricted, or disallow browser playback.");
+     });
+     player.attachMedia(vid);player.loadSource(source);
+   }else if(vid.canPlayType("application/vnd.apple.mpegurl")){
+     vid.src=source;begin();
+   }else{
+     if(startupTimer)clearTimeout(startupTimer);
+     fail("This browser cannot load HLS. Reload to retry the player library, or use an HLS-capable browser.");
+   }
  }
  tryNext();
- $("epg").textContent="Sports channel · Playback depends on the broadcaster";
+ $("epg").textContent="Sports channel · Availability depends on the broadcaster";
 }
+
 function find(id){return S.items[S.tab].filter(function(x){return String(x.id)===String(id)})[0]}
 function step(d){if(!S.view.length)return;var i=-1;S.view.forEach(function(x,k){if(S.cur&&String(x.id)===String(S.cur.id)&&S.cur.tab===S.tab)i=k});play(S.view[(i+d+S.view.length)%S.view.length])}
 function sub(){$("wsub").textContent=hasApi?(S.items[S.tab].length.toLocaleString()+(S.tab==="live"?" live channels":" movies")):"Preview mode — connect your stream API to play real channels"}
 function switchTab(t){t="live";S.tab=t;S.cat="all";S.shown=60;S.q="";$("q").value="";$("q").placeholder=t==="live"?"Search channels...":"Search movies...";
  document.querySelectorAll(".wtabs button").forEach(function(b){b.classList.toggle("on",b.dataset.tab===t)});
- load(t).then(function(){sub();renderCats();renderItems()}).catch(function(){$("wsub").textContent="Can't reach the stream server"})}
+ load(t).then(function(){sub();renderCats();renderItems()}).catch(function(){$("wsub").textContent="Channel catalog unavailable";$("items").textContent="The channel list could not be loaded. Reload to retry.";fail("Could not load the channel catalog. Reload to retry.")})}
 document.querySelector(".wtabs").addEventListener("click",function(e){var b=e.target.closest("button");if(b)switchTab(b.dataset.tab)});
 $("cats").addEventListener("click",function(e){var b=e.target.closest("button");if(!b)return;S.cat=b.dataset.c;S.shown=60;renderCats();renderItems()});
 $("items").addEventListener("click",function(e){var b=e.target.closest(".it");if(!b)return;var x=find(b.dataset.id);if(x)play(x)});
@@ -464,7 +497,7 @@ var tm;$("q").addEventListener("input",function(e){clearTimeout(tm);tm=setTimeou
 $("retry").addEventListener("click",function(){if(S.cur)play(S.cur.x)});
 $("favBtn").addEventListener("click",function(){if(!S.cur)return;var k=S.cur.tab+S.cur.id,i=S.favs.indexOf(k);if(i>-1)S.favs.splice(i,1);else S.favs.push(k);ls("mx.favs",S.favs);setFav();renderItems()});
 $("pipBtn").addEventListener("click",function(){if(document.pictureInPictureEnabled&&vid.readyState>0)vid.requestPictureInPicture().catch(function(){})});
-vid.addEventListener("playing",function(){$("pover").classList.add("hide");fails=0});
+vid.addEventListener("playing",function(){if(startupTimer)clearTimeout(startupTimer);$("pover").classList.add("hide");$("epg").textContent="Live · "+(S.cur?S.cur.x.n:"");fails=0});
 vid.addEventListener("error",function(){if(hasApi&&S.tab==="movies"&&S.cur)fail("This file can't be played in the browser")});
 document.addEventListener("keydown",function(e){var t=e.target.tagName;if(t==="INPUT"||e.ctrlKey||e.metaKey||e.altKey)return;
  if(e.key==="n")step(1);else if(e.key==="p")step(-1);else if(e.key==="f")$("favBtn").click()});
